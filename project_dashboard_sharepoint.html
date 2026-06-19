@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Execution Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Nunito', sans-serif; background: #f8f8f8; color: #111; }
+  body { display: flex; flex-direction: column; }
+
+  /* ── File connection bar ── */
+  #file-conn-bar {
+    height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    padding: 0 14px; background: #1a0203; color: #fca5a5; font-size: 13px; font-weight: 700;
+  }
+  #file-conn-bar .conn-actions { margin-left: auto; display: flex; gap: 6px; }
+
+  /* ── Layout ── */
+  #app { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+  #sidebar {
+    width: 200px; flex-shrink: 0; background: #1a0203;
+    display: flex; flex-direction: column; padding: 16px 10px; gap: 6px; overflow-y: auto;
+  }
+  #main { flex: 1; overflow-y: auto; padding: 14px 16px; }
+
+  /* ── Sidebar ── */
+  .sb-title { font-size: 12px; font-weight: 700; color: #fca5a5; letter-spacing: 1.5px; padding-left: 4px; margin-bottom: 4px; }
+  .sb-proj {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 10px; cursor: pointer; transition: background .15s;
+  }
+  .sb-proj:hover { background: rgba(194,0,11,.35); }
+  .sb-proj.active { background: #C2000B; }
+  .sb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .sb-name { font-size: 13px; font-weight: 700; color: #fca5a5; flex: 1; line-height: 1.3; word-break: break-all; }
+  .sb-proj.active .sb-name { color: #fff; }
+  .sb-proj.active .sb-dot { background: #fff !important; }
+  .sb-del {
+    background: rgba(255,255,255,.2); border: none; border-radius: 5px;
+    color: #fff; font-size: 12px; cursor: pointer; padding: 1px 5px; font-family: inherit; display: none;
+  }
+  .sb-proj.active .sb-del { display: inline; }
+  .sb-move { background: none; border: none; color: rgba(255,255,255,.5); font-size: 10px; cursor: pointer; padding: 0 2px; line-height: 1; display: none; }
+  .sb-proj.active .sb-move { display: inline; }
+  .sb-move:hover { color: #fff; }
+  .sb-add {
+    background: rgba(255,255,255,.08); color: #fca5a5;
+    border: 1px dashed rgba(252,165,165,.4); border-radius: 10px;
+    padding: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+    text-align: center; font-family: inherit; margin-top: auto;
+  }
+  .sb-add:hover { background: rgba(255,255,255,.14); }
+  .sb-total-del {
+    background: rgba(124,58,237,.25); color: #c4b5fd;
+    border: 1px solid rgba(196,181,253,.35); border-radius: 10px;
+    padding: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+    text-align: center; font-family: inherit; margin-top: auto;
+  }
+  .sb-total-del:hover { background: rgba(124,58,237,.4); }
+
+  /* ── Total Delivery overlay ── */
+  .td-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.55);
+    z-index:1000; align-items:center; justify-content:center; padding:20px;
+  }
+  .td-overlay.show { display:flex; }
+  .td-panel { background:#fff; border-radius:14px; width:100%; max-width:1100px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; }
+  .td-hdr { background:#7C3AED; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:15px; flex-shrink:0; }
+  .td-body { padding:14px 16px; overflow:auto; flex:1; }
+  .td-tbl { width:100%; border-collapse:collapse; font-size:13px; }
+  .td-tbl th { background:#7C3AED; color:#fff; padding:7px 10px; text-align:left; font-weight:700; white-space:nowrap; }
+  .td-tbl th.sortable { cursor:pointer; user-select:none; }
+  .td-tbl th.sortable:hover { background:#6D28D9; }
+  .td-tbl td { padding:6px 10px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+  .td-tbl tr:nth-child(even) td { background:#fafafa; }
+  .td-tbl tr:hover td { background:#F5F3FF; }
+  .td-comment-input { width:100%; font-size:12px; border:1px solid #e5e7eb; border-radius:5px; padding:3px 6px; background:#fff; }
+  .td-comment-input:focus { outline:none; border-color:#7C3AED; }
+  .td-gr-o { color:#059669; font-weight:700; }
+  .td-gr-x { color:#9ca3af; }
+
+  /* ── Common input/select ── */
+  input, select, button, textarea { font-family: inherit; }
+  .ei {
+    border: 1.5px solid #FCA5A5; border-radius: 7px; padding: 3px 8px;
+    font-size: 13px; background: #FFF5F5; color: #7f1d1d; outline: none; width: 100%;
+  }
+  .esel {
+    border: 1.5px solid #FCA5A5; border-radius: 7px; padding: 3px 7px;
+    font-size: 13px; background: #FFF5F5; color: #7f1d1d; outline: none; cursor: pointer;
+  }
+  .ei:focus, .esel:focus { border-color: #C2000B; }
+
+  /* ── Buttons ── */
+  .btn { background: #C2000B; color: #fff; border: none; border-radius: 8px; padding: 5px 13px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .btn-sm { padding: 3px 9px; font-size: 12px; }
+  .btn-white { background: #fff; color: #C2000B; }
+  .btn-ghost { background: rgba(255,255,255,.18); color: #fff; border: 1.5px solid rgba(255,255,255,.4); }
+  .btn-ghost.active { background: #fff; color: #C2000B; border: none; }
+  .btn-gray { background: #475569; }
+  .btn-green { background: #059669; }
+  .btn-amber { background: rgba(255,255,255,.2); color: #fff; border: none; border-radius: 8px; }
+
+  /* ── Badges ── */
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px; border: 1px solid; }
+  .badge-H { background: #FEE2E2; color: #991B1B; border-color: #F87171; }
+  .badge-M { background: #FFFBEB; color: #92400E; border-color: #FCD34D; }
+  .badge-L { background: #F0FDF4; color: #166534; border-color: #86EFAC; }
+
+  /* ── Cards ── */
+  .card { background: #fff; border: 1.5px solid #f0f0f0; border-radius: 14px; }
+  .card-red { border-color: #FEE2E2; }
+
+  /* ── Header ── */
+  #dash-header {
+    background: #C2000B; border-radius: 14px; padding: 11px 16px;
+    margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+  .hdr-title { font-size: 21px; font-weight: 800; color: #fff; letter-spacing: .2px; margin-bottom: 5px; display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+  .hdr-meta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .hdr-meta span { font-size: 13px; color: #fecaca; font-weight: 500; }
+  .hdr-meta b { color: #fff; }
+  .hdr-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .hdr-ei { font-size: 12px; background: rgba(255,255,255,.15); border: 1.5px solid rgba(255,255,255,.35); color: #fff; border-radius: 7px; padding: 3px 8px; outline: none; }
+  .hdr-ei:focus { border-color: #fff; }
+  .hdr-ei-sel { font-size: 12px; background: rgba(0,0,0,.35); border: 1.5px solid rgba(255,255,255,.35); color: #fff; border-radius: 7px; padding: 3px 6px; outline: none; }
+  .hdr-ei-sel option { background: #1a0203; color: #fff; }
+
+  /* ── Edit notice ── */
+  #edit-notice {
+    background: #FFF5F5; border: 1.5px solid #FCA5A5; border-radius: 10px;
+    padding: 8px 13px; margin-bottom: 10px; font-size: 13px; color: #991B1B;
+    display: none; align-items: center; gap: 8px;
+  }
+  #edit-notice.show { display: flex; }
+
+  /* ── Save toast ── */
+  #save-toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #059669; color: #fff; font-size: 14px; font-weight: 700;
+    padding: 10px 18px; border-radius: 10px; display: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15); z-index: 999;
+  }
+  #save-toast.show { display: block; }
+
+  /* ── Timeline ── */
+  #timeline-wrap { margin-bottom: 10px; }
+  .tl-section-lbl { font-size: 13px; font-weight: 700; color: #C2000B; letter-spacing: 1.2px; }
+  .tl-prog-bar { height: 7px; background: #FEE2E2; border-radius: 999px; overflow: hidden; margin: 8px 0 11px; }
+  .tl-prog-fill { height: 100%; background: linear-gradient(90deg,#C2000B,#EF4444); border-radius: 999px; transition: width .4s; }
+  #stages-grid { display: grid; gap: 4px; }
+  .stage-box { border-radius: 10px; padding: 6px 4px; text-align: center; border: 1.5px solid; }
+  .stage-dot { width: 8px; height: 8px; border-radius: 50%; margin: 0 auto 4px; }
+  .stage-name { font-size: 11px; font-weight: 700; line-height: 1.2; margin-bottom: 2px; }
+  .stage-pct { font-size: 11px; font-weight: 600; }
+  .stage-date { font-size: 10.5px; color: #9ca3af; margin-top: 2px; font-weight: 500; }
+  .stage-done   { background: #FFF5F5; border-color: #C2000B; }
+  .stage-active { background: #FEE2E2; border-color: #C2000B; }
+  .stage-delayed{ background: #FEE2E2; border-color: #7f1d1d; }
+  .stage-planned{ background: #f9fafb; border-color: #e5e7eb; }
+  .stage-done .stage-dot   { background: #C2000B; }
+  .stage-active .stage-dot { background: #C2000B; box-shadow: 0 0 0 3px rgba(194,0,11,.2); }
+  .stage-delayed .stage-dot{ background: #7f1d1d; }
+  .stage-planned .stage-dot{ background: #d1d5db; }
+  .stage-done .stage-name, .stage-active .stage-name { color: #991B1B; }
+  .stage-delayed .stage-name { color: #7f1d1d; }
+  .stage-planned .stage-name { color: #6b7280; }
+  .stage-done .stage-pct, .stage-active .stage-pct { color: #C2000B; }
+  .stage-planned .stage-pct { color: #9ca3af; }
+
+  /* ── Bottom grid ── */
+  #bottom-grid { display: grid; grid-template-columns: 1fr 310px; gap: 10px; align-items: start; }
+
+  /* ── Category panel ── */
+  #cats-wrap { margin-bottom: 10px; }
+  .sec-lbl { font-size: 13px; font-weight: 700; color: #C2000B; letter-spacing: 1.2px; margin-bottom: 8px; }
+  #filter-row { display: flex; gap: 5px; margin-bottom: 11px; flex-wrap: wrap; }
+  .flt-btn {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px; cursor: pointer;
+    border: 1.5px solid #d1d5db; background: transparent; color: #6b7280;
+    font-weight: 700; transition: all .15s;
+  }
+  .flt-btn.active { background: #C2000B; color: #fff; border-color: #C2000B; }
+  #cats-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+
+  /* ── Category cards ── */
+  .cat-card {
+    border-radius: 12px; padding: 9px 11px;
+    border: 1.5px solid #e5e7eb; background: #fff;
+    cursor: pointer; transition: box-shadow .15s, border-color .15s; position: relative;
+  }
+  .cat-card:hover { box-shadow: 0 4px 16px rgba(194,0,11,.12); border-color: #FCA5A5; }
+  .cat-card.selected { border-color: #C2000B; box-shadow: 0 0 0 3px #FEF2F2; }
+  .cat-card.edit-mode { cursor: default; }
+  .cat-card.edit-mode:hover { box-shadow: none; border-color: #e5e7eb; }
+  .cat-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+  .open-cnt {
+    width: 21px; height: 21px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .cat-name { font-size: 13px; font-weight: 700; color: #111; margin-bottom: 4px; line-height: 1.2; }
+  .cat-status { font-size: 12px; display: flex; align-items: center; gap: 3px; margin-bottom: 3px; font-weight: 600; }
+  .cat-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .cat-footer { display: flex; justify-content: space-between; font-size: 11px; color: #9ca3af; font-weight: 500; gap: 4px; }
+  .cat-del-btn {
+    position: absolute; top: 4px; right: 4px;
+    background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 6px;
+    color: #C2000B; font-size: 12px; cursor: pointer; padding: 1px 5px; line-height: 1.5; display: none;
+  }
+
+  /* ── Detail panel ── */
+  #detail-panel { border-radius: 14px; overflow: hidden; margin-top: 10px; display: none; border: 1.5px solid #FEE2E2; }
+  #detail-panel.show { display: block; }
+
+  /* ── Delivery/GR/IR checklist card ── */
+  #checklist-card { margin-top: 10px; }
+  .chk-hdr { display: flex; align-items: center; gap: 7px; padding: 13px 15px; }
+  .chk-chevron { font-size: 12px; color: #C2000B; width: 10px; flex-shrink: 0; }
+  .chk-body { padding: 0 15px 13px; }
+  .chk-tbl { width: 100%; border-collapse: collapse; }
+  .chk-tbl th { font-size: 11px; color: #9ca3af; font-weight: 700; text-align: left; padding: 4px 6px; border-bottom: 1.5px solid #f0f0f0; text-transform: uppercase; letter-spacing: .3px; }
+  .chk-tbl th.chk-col, .chk-tbl td.chk-cell { text-align: center; width: 56px; }
+  .chk-tbl td { padding: 5px 6px; border-bottom: 1px solid #f7f7f7; font-size: 13px; vertical-align: middle; }
+  .chk-name-cell input.ei { width: 100%; }
+  .chk-toggle { width: 27px; height: 27px; border-radius: 8px; border: none; font-weight: 800; font-size: 13px; cursor: pointer; }
+  .chk-o { background: #ECFDF5; color: #059669; }
+  .chk-x { background: #FEF2F2; color: #C2000B; }
+  .chk-del-cell { width: 22px; text-align: center; }
+  .chk-date-cell { text-align: center; width: 84px; }
+  .chk-date-input { width: 100%; font-size: 11px; padding: 3px 5px; }
+  .chk-num-cell { text-align: center; width: 84px; }
+  .chk-num-input { width: 100%; font-size: 11px; padding: 3px 5px; text-align: center; }
+  .chk-warn-col { width: 52px; padding: 0 2px !important; }
+  .chk-warn-cell { text-align: center; width: 52px; padding: 2px !important; cursor: default; }
+  .chk-warn-badge {
+    display: inline-block; background: #C2000B; color: #fff;
+    font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 6px;
+    letter-spacing: .3px; animation: warnPulse 1.4s ease-in-out infinite;
+    white-space: nowrap;
+  }
+  .chk-warn-overdue {
+    background: #450a0a; color: #fca5a5;
+  }
+  @keyframes warnPulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .7; transform: scale(1.08); }
+  }
+  .chk-row-done { background: #f3f4f6 !important; color: #9ca3af; }
+  .chk-row-done td { color: #9ca3af; background: #f3f4f6 !important; }
+  .chk-row-done .chk-name-cell span { text-decoration: line-through; }
+  .chk-date-text { font-size: 11px; color: #6b7280; font-weight: 500; }
+  .chk-grp { border: 1.5px solid #f5f5f5; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+  .chk-grp:last-child { margin-bottom: 0; }
+  .chk-grp-hdr { display: flex; align-items: center; gap: 7px; padding: 8px 10px; cursor: pointer; background: #FFF8F8; user-select: none; }
+  .chk-grp-hdr .chk-chevron { font-size: 11px; }
+  .chk-grp-name { font-size: 13px; font-weight: 700; color: #111; flex: 1; }
+  .chk-grp-name-input { flex: 1; font-weight: 700; }
+  .chk-grp-del { background: none; border: none; color: #C2000B; font-size: 13px; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+  .chk-grp-poso { display: flex; gap: 5px; flex-shrink: 0; }
+  .chk-poso-input { width: 84px; font-size: 11px; padding: 3px 6px; }
+  .chk-grp-poso-disp { font-size: 11px; color: #9ca3af; font-weight: 600; flex-shrink: 0; white-space: nowrap; }
+  .chk-grp-body { padding: 8px 10px 10px; }
+  .chk-add-grp-btn { margin-top: 6px; }
+
+  /* ── Mail summary (Power Automate) ── */
+  .mail-summary-section .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  #mail-last-updated { font-size: 11px; color: #9ca3af; font-weight: 600; }
+  .mail-summary-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 10px; }
+  .mail-empty { padding: 16px; text-align: center; color: #9ca3af; font-size: 13px; grid-column: 1 / -1; }
+  .mail-card { background: #fff; border: 1.5px solid #f0f0f0; border-left: 5px solid #d1d5db; border-radius: 12px; padding: 11px 13px; }
+  .mail-risk-red { border-left-color: #C2000B; }
+  .mail-risk-amber { border-left-color: #D97706; }
+  .mail-risk-green { border-left-color: #059669; }
+  .mail-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+  .mail-project { font-size: 11px; font-weight: 700; color: #6b7280; }
+  .mail-time { font-size: 11px; color: #9ca3af; margin-left: auto; font-weight: 600; }
+  .mail-subject { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 4px; line-height: 1.35; }
+  .mail-summary-text { font-size: 13px; color: #374151; line-height: 1.5; margin-bottom: 8px; }
+  .mail-meta-row { font-size: 12px; color: #374151; margin-bottom: 8px; }
+  .mail-foot-row { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #6b7280; border-top: 1px solid #f3f4f6; padding-top: 7px; }
+  .mail-reply-yes { color: #C2000B; font-weight: 700; }
+  .mail-reply-no { color: #6b7280; }
+  .badge-C { background: #450a0a; color: #FECACA; border-color: #7f1d1d; }
+  .dp-header { background: #C2000B; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+  .dp-title { font-size: 14px; font-weight: 700; color: #fff; }
+  .dp-close { background: rgba(255,255,255,.2); border: none; color: #fff; cursor: pointer; font-size: 13px; border-radius: 6px; padding: 2px 9px; font-weight: 700; }
+  .dp-body { padding: 11px 15px; background: #fff; }
+  .dp-kpis { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-bottom: 11px; }
+  .dp-kpi { background: #f9fafb; border-radius: 10px; padding: 8px; text-align: center; }
+  .dp-kpi.red { border: 1.5px solid #FEE2E2; }
+  .dp-kpi-val { font-size: 22px; font-weight: 700; color: #111; }
+  .dp-kpi.red .dp-kpi-val { color: #C2000B; }
+  .dp-kpi-lbl { font-size: 11px; color: #6b7280; margin-top: 2px; font-weight: 600; }
+
+  /* ── Issue table ── */
+  .issue-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .issue-tbl th { background: #C2000B; color: #fff; padding: 5px 7px; text-align: left; font-weight: 700; white-space: nowrap; }
+  .issue-tbl td { padding: 5px 7px; border-bottom: 0.5px solid #f0f0f0; vertical-align: middle; }
+  .issue-tbl tr:nth-child(even) td { background: #fafafa; }
+  .issue-tbl tr.closed-row { opacity: .42; }
+  .issue-tbl tr.closed-row .issue-desc { text-decoration: line-through; color: #9ca3af; }
+  .status-sel-closed { background: #F3F4F6 !important; color: #9CA3AF !important; border-color: #D1D5DB !important; }
+  .pbadge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 20px; font-weight: 700; }
+  .pbadge-H { background: #FEE2E2; color: #991B1B; border: 1px solid #F87171; }
+  .pbadge-M { background: #FFFBEB; color: #92400E; border: 1px solid #FCD34D; }
+  .pbadge-L { background: #F0FDF4; color: #166534; border: 1px solid #86EFAC; }
+  .del-issue-btn { background: none; border: none; color: #C2000B; font-size: 16px; cursor: pointer; padding: 2px 4px; }
+
+  /* ── Category update log (date / description / photo) ── */
+  .upd-row { display: flex; align-items: center; gap: 10px; padding: 6px 2px; position: relative; }
+  .upd-row.edit-mode { flex-wrap: wrap; padding-right: 22px; }
+  .upd-date { font-size: 12px; color: #6b7280; font-weight: 600; white-space: nowrap; min-width: 80px; }
+  .upd-desc { font-size: 13px; color: #111; flex: 1; line-height: 1.4; }
+  .upd-desc-input { flex: 1; min-width: 140px; }
+  .upd-photo-preview { width: 120px; height: 84px; object-fit: cover; border-radius: 8px; border: 1.5px solid #f0f0f0; flex-shrink: 0; }
+  .upd-photo-area { display: flex; align-items: center; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+  .upd-photo-btn { cursor: pointer; white-space: nowrap; }
+  .upd-del-btn { position: absolute; top: 2px; right: 0; }
+  .chk-mail-btn { padding: 2px 6px; font-size: 13px; line-height: 1.2; }
+
+  /* ── Photo lightbox ── */
+  .lightbox-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.82);
+    z-index: 1000; align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  .lightbox-overlay.show { display: flex; }
+  .lightbox-overlay img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: 10px; cursor: default; }
+  .lightbox-close {
+    position: absolute; top: 18px; right: 22px; background: rgba(255,255,255,.15); border: none;
+    color: #fff; font-size: 20px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,.3); }
+  .upd-photo-preview { cursor: zoom-in; }
+
+  /* ── GR mail modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
+    z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: #fff; border-radius: 14px; width: 100%; max-width: 480px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-hdr { background: #C2000B; color: #fff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 14px; }
+  .modal-close { background: none; border: none; color: #fff; font-size: 16px; cursor: pointer; }
+  .modal-body { padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .modal-lbl { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .3px; margin-top: 8px; }
+  .modal-ftr { padding: 12px 16px; border-top: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .btn-outline { background: #fff; color: #C2000B; border: 1.5px solid #fca5a5; }
+
+  /* ── Right panel ── */
+  #right-col { display: flex; flex-direction: column; gap: 8px; }
+  .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 11px; }
+  .kpi-box { background: #f9fafb; border-radius: 10px; padding: 9px; text-align: center; border: 1.5px solid #FEE2E2; }
+  .kpi-val { font-size: 24px; font-weight: 700; color: #C2000B; }
+  .kpi-lbl { font-size: 12px; color: #6b7280; margin-top: 2px; font-weight: 600; }
+  .risk-box { border-radius: 10px; padding: 9px; text-align: center; }
+  .risk-val { font-size: 16px; font-weight: 700; }
+  .risk-lbl { font-size: 12px; margin-top: 2px; opacity: .85; font-weight: 600; }
+  .sum-card { border-radius: 14px; overflow: hidden; border: 1.5px solid #FEE2E2; }
+  .sum-hdr { padding: 8px 13px; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; border-bottom: 1.5px solid; }
+  .sum-body { padding: 8px 13px; background: #fff; }
+  .sum-item { display: flex; align-items: flex-start; gap: 5px; padding: 3px 0; font-size: 13px; color: #4b5563; line-height: 1.5; }
+  .sum-arrow { font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .sum-text { font-weight: 500; flex: 1; }
+  .sum-ei { border: 1.5px solid #FCA5A5; border-radius: 7px; padding: 3px 8px; font-size: 13px; background: #FFF5F5; color: #7f1d1d; outline: none; flex: 1; }
+  .sum-del { background: none; border: none; color: #C2000B; font-size: 15px; cursor: pointer; padding: 0 2px; flex-shrink: 0; }
+  .foot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .foot-card { border-radius: 12px; padding: 11px; text-align: center; }
+
+  /* ── VO (Variation Order) contract value history ── */
+  .vo-totals { display: flex; gap: 6px; padding: 8px 13px; background: #F0FDF4; border-bottom: 1.5px solid #86EFAC; }
+  .vo-tot-box { flex: 1; text-align: center; }
+  .vo-tot-lbl { font-size: 10.5px; color: #065F46; font-weight: 700; letter-spacing: .3px; }
+  .vo-tot-val { font-size: 14px; color: #065F46; font-weight: 700; margin-top: 2px; }
+  .vo-item { padding: 7px 0; border-bottom: 1px dashed #E5E7EB; }
+  .vo-item:last-child { border-bottom: none; }
+  .vo-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+  .vo-id { font-size: 12px; font-weight: 700; color: #065F46; }
+  .vo-date { font-size: 11px; color: #9ca3af; font-weight: 600; }
+  .vo-desc { font-size: 13px; color: #374151; font-weight: 500; margin-bottom: 4px; line-height: 1.4; }
+  .vo-price-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .vo-before { font-size: 12.5px; color: #9ca3af; text-decoration: line-through; }
+  .vo-arrow { font-size: 13px; color: #9ca3af; }
+  .vo-after { font-size: 14px; font-weight: 700; color: #111; }
+  .vo-delta { font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 6px; }
+  .vo-delta.up { background: #ECFDF5; color: #059669; }
+  .vo-delta.down { background: #FEF2F2; color: #C2000B; }
+  .vo-delta.flat { background: #F3F4F6; color: #6b7280; }
+  .vo-edit-row { display: flex; gap: 4px; margin-bottom: 4px; }
+  .vo-del-btn { background: none; border: none; color: #C2000B; font-size: 14px; cursor: pointer; position: absolute; top: 7px; right: 0; }
+  .fin-highlight { background: #ECFDF5; padding: 12px 13px; text-align: center; border-bottom: 1.5px solid #86EFAC; }
+  .fin-highlight-lbl { font-size: 11px; font-weight: 700; color: #065F46; letter-spacing: .4px; }
+  .fin-highlight-val { font-size: 23px; font-weight: 800; color: #065F46; margin-top: 2px; }
+  .fin-highlight-sub { font-size: 11.5px; color: #059669; margin-top: 3px; font-weight: 600; }
+
+  /* ── Financial Aspect: wide & thin horizontal layout ── */
+  .fin-row { display: flex; align-items: stretch; gap: 0; min-height: 0; }
+  .fin-col { display: flex; flex-direction: column; padding: 10px 14px; min-width: 0; }
+  .fin-col-title { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px; white-space: nowrap; }
+  .fin-col-highlight { flex: 0 0 172px; background: #ECFDF5; border-right: 1.5px solid #86EFAC; justify-content: center; text-align: center; padding: 10px 12px; }
+  .fin-col-highlight .fin-highlight-lbl { font-size: 10px; }
+  .fin-col-highlight .fin-highlight-val { font-size: 18px; margin-top: 2px; }
+  .fin-col-highlight .fin-highlight-sub { font-size: 10px; margin-top: 3px; line-height: 1.4; }
+  .fin-col-notes { flex: 0 0 190px; }
+  .fin-notes-list { max-height: 72px; overflow-y: auto; }
+  .fin-col-divider { width: 2px; background: #E5E7EB; flex-shrink: 0; margin: 8px 0; }
+  .fin-col-vo { flex: 1; }
+  .fin-vo-scroll { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; align-items: stretch; }
+  .vo-chip { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 9px; min-width: 148px; flex-shrink: 0; position: relative; }
+  .vo-chip-edit { min-width: 148px; padding-top: 18px; }
+  .vo-chip-top { display: flex; justify-content: space-between; gap: 5px; font-size: 10.5px; color: #6b7280; font-weight: 700; margin-bottom: 3px; }
+  .vo-chip-desc { font-size: 11px; color: #374151; font-weight: 500; margin-bottom: 5px; line-height: 1.3; }
+  .vo-chip-price { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; font-size: 10.5px; color: #6b7280; }
+  .vo-chip-delta { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 5px; }
+  .vo-chip-delta.up { background: #ECFDF5; color: #059669; }
+  .vo-chip-delta.down { background: #FEF2F2; color: #C2000B; }
+  .vo-chip-delta.flat { background: #F3F4F6; color: #6b7280; }
+  .vo-add-chip { flex-shrink: 0; align-self: center; }
+  .fin-vo-section { padding: 7px 13px 11px; border-top: 1px solid #F3F4F6; }
+  .fin-vo-hdr { font-size: 11.5px; font-weight: 700; color: #6b7280; letter-spacing: .4px; margin-bottom: 4px; text-transform: uppercase; }
+  .foot-lbl { font-size: 11.5px; font-weight: 700; margin-bottom: 4px; }
+  .foot-val { font-size: 13px; font-weight: 700; color: #fff; }
+
+  /* ── Responsive ── */
+  @media(max-width:900px) {
+    #bottom-grid { grid-template-columns: 1fr; }
+    #cats-grid { grid-template-columns: repeat(2,1fr); }
+  }
+  @media(max-width:600px) {
+    #app { flex-direction: column; height: auto; }
+    #sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; min-height: auto; }
+    #cats-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div id="file-conn-bar">
+  <span id="file-conn-icon">⚪</span>
+  <span id="file-conn-status">Not connected to a data file</span>
+  <div class="conn-actions">
+    <button class="btn btn-sm" onclick="connectExisting()">📂 Open Existing File</button>
+    <button class="btn btn-white btn-sm" onclick="createNew()">＋ Create New File</button>
+    <button class="btn btn-ghost btn-sm" id="refresh-btn" style="display:none" onclick="refreshFromFile()">🔄 Refresh</button>
+  </div>
+</div>
+
+<div id="app">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sb-title">PROJECTS</div>
+    <div id="proj-list"></div>
+    <button class="sb-total-del" onclick="openTotalDelivery()">📦 Total Delivery</button>
+    <button class="sb-add" style="margin-top:4px;" onclick="addProject()">+ Add Project</button>
+    <div style="text-align:center;padding:10px 6px 4px;">
+      <img src="data:image/png;base64,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" alt="ABB" style="width:100%;max-width:120px;object-fit:contain;opacity:.92;">
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <!-- HEADER -->
+    <div id="dash-header">
+      <div>
+        <div class="hdr-title" id="hdr-title"></div>
+        <div class="hdr-meta" id="hdr-meta"></div>
+      </div>
+      <div class="hdr-actions" id="hdr-actions"></div>
+    </div>
+
+    <!-- EDIT NOTICE -->
+    <div id="edit-notice">
+      <span style="font-size:16px">✏️</span>
+      <span><b>Edit Mode</b> — You can edit any field directly. Click <b>Save & Share</b> to save to the connected data file and share it with your team.</span>
+    </div>
+
+    <!-- TIMELINE -->
+    <div id="timeline-wrap" class="card card-red" style="padding:13px 15px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div class="tl-section-lbl">EXECUTION TIMELINE</div>
+        <div style="display:flex;align-items:center;gap:10px;" id="tl-right"></div>
+      </div>
+      <div class="tl-prog-bar"><div class="tl-prog-fill" id="tl-fill"></div></div>
+      <div id="stages-grid"></div>
+    </div>
+
+    <!-- FINANCIAL ASPECT (full width, wide & short) -->
+    <div id="sum-decisions" class="sum-card" style="margin-bottom:10px;"></div>
+
+    <!-- BOTTOM -->
+    <div id="bottom-grid">
+      <div>
+        <!-- CATS -->
+        <div class="card card-red" style="padding:13px 15px;" id="cats-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+            <div class="sec-lbl">ISSUE &amp; REQUIREMENT</div>
+            <div id="cats-add-btn"></div>
+          </div>
+          <div id="filter-row"></div>
+          <div id="cats-grid"></div>
+        </div>
+        <!-- DETAIL -->
+        <div id="detail-panel">
+          <div class="dp-header">
+            <span class="dp-title" id="dp-title"></span>
+            <button class="dp-close" onclick="closeDetail()">✕ Close</button>
+          </div>
+          <div class="dp-body">
+            <div class="dp-kpis" id="dp-kpis"></div>
+            <div style="overflow-x:auto;"><table class="issue-tbl" id="issue-tbl"><thead id="issue-thead"></thead><tbody id="issue-tbody"></tbody></table></div>
+            <div id="add-issue-btn" style="margin-top:6px;"></div>
+          </div>
+        </div>
+      </div>
+      <div id="right-col">
+        <div id="next-plan-card"></div>
+        <div class="card card-red">
+          <div class="kpi-row" id="kpi-row"></div>
+        </div>
+        <div id="sum-criticals" class="sum-card"></div>
+        <div id="sum-actions" class="sum-card"></div>
+      </div>
+    </div>
+
+    <!-- DELIVERY/GR/IR CHECKLIST (full width) -->
+    <div class="card card-red" id="checklist-card"></div>
+  </div>
+</div>
+
+<div id="save-toast">✓ Saved!</div>
+
+<div id="total-delivery-overlay" class="td-overlay" onclick="closeTotalDelivery()">
+  <div class="td-panel" onclick="event.stopPropagation()">
+    <div class="td-hdr">
+      <span>📦 Total Delivery</span>
+      <button class="modal-close" onclick="closeTotalDelivery()">✕</button>
+    </div>
+    <div class="td-body">
+      <div id="td-table-wrap"></div>
+    </div>
+  </div>
+</div>
+
+<div id="photo-lightbox" class="lightbox-overlay" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <img id="lightbox-img" src="" onclick="event.stopPropagation()">
+</div>
+
+<div id="gr-mail-modal" class="modal-overlay" onclick="closeGrMailModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <span>GR 요청 메일</span>
+      <button class="modal-close" onclick="closeGrMailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="modal-lbl">받는 사람</label>
+      <input id="gr-mail-to" class="ei" style="width:100%" placeholder="name@company.com" oninput="saveGrMailField('grEmail',this.value)">
+      <label class="modal-lbl">참조 (CC)</label>
+      <input id="gr-mail-cc" class="ei" style="width:100%" placeholder="cc1@company.com, cc2@company.com" oninput="saveGrMailField('grCc',this.value)">
+      <label class="modal-lbl">제목</label>
+      <input id="gr-mail-subject" class="ei" style="width:100%" oninput="saveGrMailField('grSubject',this.value)">
+      <label class="modal-lbl">내용</label>
+      <textarea id="gr-mail-body" class="ei" style="width:100%;height:200px;resize:vertical;font-family:inherit" oninput="saveGrMailField('grBody',this.value)"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline btn-sm" onclick="resetGrMailDefault()">기본 양식으로 초기화</button>
+      <button class="btn btn-sm" onclick="sendGrMailNow()">✉️ Outlook으로 메일 작성</button>
+    </div>
+  </div>
+</div>
+
+<div id="ir-mail-modal" class="modal-overlay" onclick="closeIrMailModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-hdr" style="background:#1D4ED8;">
+      <span>IR 요청 메일</span>
+      <button class="modal-close" onclick="closeIrMailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="modal-lbl">받는 사람</label>
+      <input id="ir-mail-to" class="ei" style="width:100%" oninput="saveIrMailField('irEmail',this.value)">
+      <label class="modal-lbl">참조 (CC)</label>
+      <input id="ir-mail-cc" class="ei" style="width:100%" oninput="saveIrMailField('irCc',this.value)">
+      <label class="modal-lbl">제목</label>
+      <input id="ir-mail-subject" class="ei" style="width:100%" oninput="saveIrMailField('irSubject',this.value)">
+      <label class="modal-lbl">내용</label>
+      <textarea id="ir-mail-body" class="ei" style="width:100%;height:200px;resize:vertical;font-family:inherit" oninput="saveIrMailField('irBody',this.value)"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline btn-sm" onclick="resetIrMailDefault()">기본 양식으로 초기화</button>
+      <button class="btn btn-sm" style="background:#1D4ED8;" onclick="sendIrMailNow()">✉️ Outlook으로 메일 작성</button>
+    </div>
+  </div>
+</div>
+
+<div id="inv-mail-modal" class="modal-overlay" onclick="closeInvoiceMailModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-hdr" style="background:#7C3AED;">
+      <span>📄 Invoice Request 메일</span>
+      <button class="modal-close" onclick="closeInvoiceMailModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="modal-lbl">받는 사람</label>
+      <input id="inv-mail-to" class="ei" style="width:100%" oninput="saveInvoiceMailField('invEmail',this.value)">
+      <label class="modal-lbl">참조 (CC)</label>
+      <input id="inv-mail-cc" class="ei" style="width:100%" placeholder="(선택)">
+      <label class="modal-lbl">제목</label>
+      <input id="inv-mail-subject" class="ei" style="width:100%" oninput="saveInvoiceMailField('invSubject',this.value)">
+      <label class="modal-lbl">내용</label>
+      <textarea id="inv-mail-body" class="ei" style="width:100%;height:200px;resize:vertical;font-family:inherit" oninput="saveInvoiceMailField('invBody',this.value)"></textarea>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn btn-outline btn-sm" onclick="resetInvoiceMailDefault()">기본 양식으로 초기화</button>
+      <button class="btn btn-sm" style="background:#7C3AED;" onclick="sendInvoiceMailNow()">✉️ Outlook으로 메일 작성</button>
+    </div>
+  </div>
+</div>
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const BRAND = "#C2000B";
+const PROJ_COLORS = ["#C2000B","#1D4ED8","#059669","#D97706","#7C3AED","#0891B2","#DB2777","#374151"];
+
+function defaultMeta(name="New Project"){
+  return {name, pm:"PM Name", pmm:"", pms:"", pmo:"", date:new Date().toLocaleDateString("en-US"), progress:0, risk:"GREEN", milestone:"", nextplan:"", poNumber:"", soNumber:"", seriesCount:"", shipyard:"", hullNum:"", projType:"SG", owner:"", classM:"DNV", classS:"DNV"};
+}
+function defaultStages(){
+  return [
+    {id:1,name:"Kick-off",date:"",pct:0,status:"planned"},
+    {id:2,name:"Engineering",date:"",pct:0,status:"planned"},
+    {id:3,name:"Manufacturing",date:"",pct:0,status:"planned"},
+    {id:4,name:"FAT",date:"",pct:0,status:"planned"},
+    {id:5,name:"Delivery",date:"",pct:0,status:"planned"},
+    {id:6,name:"Installation",date:"",pct:0,status:"planned"},
+    {id:7,name:"Commissioning",date:"",pct:0,status:"planned"},
+    {id:8,name:"Warranty",date:"",pct:0,status:"planned"},
+  ];
+}
+function defaultCats(){
+  return [
+    {id:1,name:"Integration",priority:"High",status:"Open",due:"",owner:"",issues:[]},
+    {id:2,name:"Stakeholder",priority:"Medium",status:"Open",due:"",owner:"",issues:[]},
+    {id:3,name:"Scope & Change",priority:"High",status:"Open",due:"",owner:"",issues:[]},
+    {id:4,name:"Schedule",priority:"High",status:"Open",due:"",owner:"",issues:[]},
+    {id:5,name:"Risk & Opportunity",priority:"High",status:"Open",due:"",owner:"",issues:[]},
+    {id:6,name:"Quality",priority:"Medium",status:"Open",due:"",owner:"",issues:[]},
+  ];
+}
+function defaultSummary(){ return {criticals:[""],actions:[""],decisions:[],voHistory:[]}; }
+function defaultChecklist(){ return []; }
+
+function sampleProject(){
+  return {
+    meta:{name:"LNG FPSO Module Fabrication",pm:"Kevin Park",date:"12 Jun 2026",progress:45,risk:"AMBER",milestone:"Vendor FAT — Jun 25",nextplan:"Complete Manufacturing"},
+    stages:[
+      {id:1,name:"Kick-off",date:"Jan 15",pct:100,status:"done"},
+      {id:2,name:"Engineering",date:"Feb 28",pct:100,status:"done"},
+      {id:3,name:"Manufacturing",date:"Jun 30",pct:40,status:"active"},
+      {id:4,name:"FAT",date:"Jul 25",pct:0,status:"planned"},
+      {id:5,name:"Delivery",date:"Aug 15",pct:0,status:"planned"},
+      {id:6,name:"Installation",date:"Sep 30",pct:0,status:"planned"},
+      {id:7,name:"Commissioning",date:"Nov 10",pct:0,status:"planned"},
+      {id:8,name:"Warranty",date:"Dec 15",pct:0,status:"planned"},
+    ],
+    cats:[
+      {id:1,name:"Integration",priority:"High",status:"In Progress",due:"Jun 20",owner:"K. Park",issues:[
+        {id:"I-01",desc:"Interface spec not finalized between FPSO topsides and hull",priority:"High",status:"Open",due:"Jun 15"},
+        {id:"I-02",desc:"Data exchange protocol mismatch with EPC partner",priority:"High",status:"In Progress",due:"Jun 20"},
+        {id:"I-03",desc:"3D model clash detection — 12 unresolved clashes",priority:"Medium",status:"In Progress",due:"Jun 25"},
+      ]},
+      {id:2,name:"Stakeholder",priority:"Medium",status:"Open",due:"Jun 30",owner:"J. Lee",issues:[
+        {id:"S-01",desc:"Client rep not available for weekly review",priority:"Medium",status:"Open",due:"Jun 30"},
+      ]},
+      {id:3,name:"Scope & Change",priority:"High",status:"In Progress",due:"Jun 15",owner:"M. Kim",issues:[
+        {id:"SC-01",desc:"Scope change #12 — piping reroute, cost impact TBD",priority:"High",status:"In Progress",due:"Jun 14"},
+        {id:"SC-02",desc:"Client requested CE marking on electrical components",priority:"High",status:"Open",due:"Jun 20"},
+        {id:"SC-03",desc:"FAT test procedure revision required by DNV GL",priority:"High",status:"Open",due:"Jun 18"},
+        {id:"SC-04",desc:"Structural reinforcement due to load recalculation",priority:"Medium",status:"In Progress",due:"Jun 25"},
+      ]},
+      {id:4,name:"Schedule",priority:"High",status:"In Progress",due:"Jun 18",owner:"Y. Jung",issues:[
+        {id:"SCH-01",desc:"Vendor Q5 delivery delayed 3 weeks — Manufacturing impacted",priority:"High",status:"Open",due:"Jun 15"},
+        {id:"SCH-02",desc:"Monsoon season risk — outdoor installation window at risk",priority:"High",status:"In Progress",due:"Jun 30"},
+        {id:"SCH-03",desc:"Regulatory inspection lead time extended to 6 weeks",priority:"High",status:"Open",due:"Jun 18"},
+      ]},
+      {id:5,name:"Risk & Opportunity",priority:"High",status:"In Progress",due:"Jun 12",owner:"K. Park",issues:[
+        {id:"RO-01",desc:"Extreme weather — outdoor work halt risk >5 days",priority:"High",status:"Open",due:"Jul 01"},
+        {id:"RO-02",desc:"Sub-vendor capacity constraint — 2nd shift unconfirmed",priority:"High",status:"In Progress",due:"Jun 20"},
+        {id:"RO-03",desc:"Early delivery incentive — $200K if before Aug 10",priority:"Medium",status:"Open",due:"Jun 30"},
+      ]},
+      {id:6,name:"Procurement",priority:"High",status:"In Progress",due:"Jun 22",owner:"M. Kim",issues:[
+        {id:"P-01",desc:"Valve package — vendor Q5 — ETA revised to Jul 5",priority:"High",status:"Open",due:"Jun 22"},
+        {id:"P-02",desc:"Flange supply shortage — 2 alternative vendors evaluated",priority:"High",status:"In Progress",due:"Jun 20"},
+        {id:"P-03",desc:"Sub-vendor mobilization order not yet issued",priority:"Medium",status:"Open",due:"Jun 14"},
+      ]},
+    ],
+    summary:{
+      criticals:["Vendor Q5 delivery delayed 3 wks — impacting Manufacturing start","Integration interface spec not finalized","Scope change #12 unresolved — cost impact TBD"],
+      actions:["Client approval on revised ITP by Jun 15","Sub-vendor mobilization order — K. Park by Jun 14"],
+      decisions:["Expedite air freight vs sea freight for valve package","Approve overtime budget (+$180K) for schedule recovery"],
+      voHistory:[
+        {id:"VO-01",date:"Apr 02, 2026",desc:"Scope change #12 — piping reroute incorporated",before:24500000,after:24850000},
+        {id:"VO-02",date:"May 20, 2026",desc:"Additional work for CE marking on electrical components",before:24850000,after:25100000},
+      ],
+    },
+    deliveryChecklist:[
+      {id:1,name:"Topside Module",collapsed:false,items:[
+        {id:1,name:"Pressure Vessel #1",delivery:"O",deliveryDate:"Apr 02, 2026",gr:"O",grDate:"Apr 05, 2026",ir:"X"},
+        {id:2,name:"Piping Package A",delivery:"O",deliveryDate:"May 10, 2026",gr:"X",grDate:"",ir:"X"},
+      ]},
+      {id:2,name:"Hull Structure",collapsed:false,items:[
+        {id:3,name:"Valve Package (Vendor Q5)",delivery:"X",deliveryDate:"",gr:"X",grDate:"",ir:"X"},
+      ]},
+    ],
+  };
+}
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let projects = [];   // [{id, name, color}]
+let activeId = null;
+let projData = {};   // {[id]: {meta,stages,cats,summary}}
+let editMode = false;
+let selCatId = null;
+let filterBy = "all";
+let mailSummary = [];
+let checklistCardCollapsed = false;
+var selFinancialIdx = 0; // 0-based index per series, -1 = ALL (var = accessible on window)
+
+// ═══════════════════════════════════════════
+// STORAGE  (read/write directly to a JSON file in a SharePoint/OneDrive synced folder)
+// ═══════════════════════════════════════════
+let fileHandle = null;
+let lastStamp = null; // for conflict detection: timestamp of the last save I read or wrote
+const FS_SUPPORTED = "showOpenFilePicker" in window;
+
+// --- Save the file handle in IndexedDB so the same browser can auto-reconnect next time ---
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const req = indexedDB.open("dash-fs-db",1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore("kv");
+    req.onsuccess = ()=> res(req.result);
+    req.onerror = ()=> rej(req.error);
+  });
+}
+async function idbSet(k,v){
+  const db = await idbOpen();
+  return new Promise((res)=>{
+    const tx = db.transaction("kv","readwrite");
+    tx.objectStore("kv").put(v,k);
+    tx.oncomplete = ()=>res();
+  });
+}
+async function idbGet(k){
+  const db = await idbOpen();
+  return new Promise((res)=>{
+    const tx = db.transaction("kv","readonly");
+    const req = tx.objectStore("kv").get(k);
+    req.onsuccess = ()=> res(req.result||null);
+    req.onerror = ()=> res(null);
+  });
+}
+
+function setConnUI(state, name){
+  const icon = document.getElementById("file-conn-icon");
+  const status = document.getElementById("file-conn-status");
+  const refreshBtn = document.getElementById("refresh-btn");
+  if(state==="connected"){
+    icon.textContent = "🟢";
+    status.textContent = "Connected: " + name;
+    refreshBtn.style.display = "inline-block";
+  } else if(state==="need-reconnect"){
+    icon.textContent = "🟡";
+    status.textContent = name + " — Permission needs to be reconfirmed. Please click 'Open Existing File' again.";
+    refreshBtn.style.display = "none";
+  } else {
+    icon.textContent = "⚪";
+    status.textContent = FS_SUPPORTED
+      ? "Not connected to a data file"
+      : "This browser is not supported. Please open this in the latest version of Edge.";
+    refreshBtn.style.display = "none";
+  }
+}
+
+async function connectExisting(){
+  if(!FS_SUPPORTED){ alert("This feature is only available in the latest version of Edge (or Chrome)."); return; }
+  try{
+    const [h] = await window.showOpenFilePicker({
+      types:[{description:"Dashboard data file", accept:{"application/json":[".json"]}}]
+    });
+    fileHandle = h;
+    try{ await idbSet("dataFileHandle", h); }catch(e){ /* auto-reconnect convenience only, not critical */ }
+    await loadFromFile();
+  }catch(e){ /* user cancelled the picker */ }
+}
+
+async function createNew(){
+  if(!FS_SUPPORTED){ alert("This feature is only available in the latest version of Edge (or Chrome)."); return; }
+  try{
+    const h = await window.showSaveFilePicker({
+      suggestedName:"dashboard-data.json",
+      types:[{description:"Dashboard data file", accept:{"application/json":[".json"]}}]
+    });
+    fileHandle = h;
+    try{ await idbSet("dataFileHandle", h); }catch(e){ /* auto-reconnect convenience only, not critical */ }
+    const pid = "proj_"+Date.now();
+    const s = sampleProject();
+    projects = [{id:pid,name:s.meta.name,color:BRAND}];
+    projData = {[pid]: s};
+    activeId = pid;
+    mailSummary = [];
+    await writeToFile();
+    setConnUI("connected", h.name);
+    render();
+  }catch(e){ /* user cancelled */ }
+}
+
+async function refreshFromFile(){
+  if(!fileHandle) return;
+  await loadFromFile();
+}
+
+async function loadFromFile(){
+  try{
+    const file = await fileHandle.getFile();
+    const text = await file.text();
+    const data = text.trim() ? JSON.parse(text) : null;
+    if(data && data.projects && data.projects.length){
+      projects = data.projects;
+      projData = data.projData || {};
+      activeId = projects[0].id;
+      lastStamp = data._stamp || file.lastModified;
+    } else {
+      const pid = "proj_"+Date.now();
+      const s = sampleProject();
+      projects = [{id:pid,name:s.meta.name,color:BRAND}];
+      projData = {[pid]: s};
+      activeId = pid;
+    }
+    mailSummary = (data && Array.isArray(data.mailSummary)) ? data.mailSummary : [];
+    editMode = false; selCatId = null; filterBy = "all";
+    setConnUI("connected", fileHandle.name);
+    render();
+  }catch(e){
+    console.error("loadFromFile error:", e);
+    alert("There was a problem reading the file. Please reconnect.\n\n(Details: " + (e && e.message ? e.message : e) + ")");
+    setConnUI("disconnected");
+  }
+}
+
+async function writeToFile(){
+  if(!fileHandle){
+    alert("Please connect a data file first using 'Open Existing File' or 'Create New File'.");
+    return false;
+  }
+  try{
+    let perm = await fileHandle.queryPermission({mode:"readwrite"});
+    if(perm !== "granted") perm = await fileHandle.requestPermission({mode:"readwrite"});
+    if(perm !== "granted"){ alert("Save permission was denied."); return false; }
+  }catch(e){ alert("An error occurred while checking save permission."); return false; }
+
+  // Conflict detection: check if another teammate saved before me since my last read
+  // Also: preserve whatever mail-related fields are currently on disk, since Power Automate
+  // writes to this same file independently and the dashboard should never clobber it.
+  try{
+    const current = await fileHandle.getFile();
+    const onDiskText = await current.text();
+    const onDisk = onDiskText.trim() ? JSON.parse(onDiskText) : null;
+    if(onDisk && onDisk._stamp && lastStamp && onDisk._stamp !== lastStamp){
+      const proceed = confirm("Another team member has saved changes in the meantime.\nOverwrite with your changes?\n(We recommend clicking Cancel and using '🔄 Refresh' to check the latest content first)");
+      if(!proceed) return false;
+    }
+    if(onDisk && Array.isArray(onDisk.mailSummary)){
+      mailSummary = onDisk.mailSummary;
+    }
+  }catch(e){ /* proceed with save even if comparison fails */ }
+
+  const stamp = Date.now();
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify({_stamp:stamp, projects, projData, mailSummary}, null, 2));
+  await writable.close();
+  lastStamp = stamp;
+  renderMailSummary();
+  return true;
+}
+
+async function tryAutoConnect(){
+  setConnUI("disconnected");
+  if(!FS_SUPPORTED){ render(); return; }
+  let h = null;
+  try{ h = await idbGet("dataFileHandle"); }catch(e){}
+  if(!h){ render(); return; }
+  try{
+    const perm = await h.queryPermission({mode:"readwrite"});
+    if(perm === "granted"){
+      fileHandle = h;
+      await loadFromFile();
+      return;
+    }
+  }catch(e){}
+  setConnUI("need-reconnect", h.name);
+  render();
+}
+
+function getCurrent(){ return projData[activeId]; }
+
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function statusColor(s){ return {Open:"#D97706","In Progress":"#C2000B",Closed:"#059669"}[s]||"#6b7280"; }
+function riskStyle(r){ return {RED:{bg:BRAND,c:"#fff"},AMBER:{bg:"#D97706",c:"#fff"},GREEN:{bg:"#059669",c:"#fff"}}[r]||{bg:"#D97706",c:"#fff"}; }
+function priorityBadge(p){
+  const m={High:"H",Medium:"M",Low:"L"};
+  return `<span class="badge badge-${m[p]||"M"}">${p}</span>`;
+}
+function priorityCls(p){ return {High:"H",Medium:"M",Low:"L"}[p]||"M"; }
+function stageClass(s){ return {done:"stage-done",active:"stage-active",delayed:"stage-delayed",planned:"stage-planned"}[s]||"stage-planned"; }
+
+// select option HTML
+function opts(list, val){ return list.map(o=>`<option value="${esc(o)}"${o===val?" selected":""}>${esc(o)}</option>`).join(""); }
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+function render(){
+  renderSidebar();
+  renderHeader();
+  renderTimeline();
+  renderCats();
+  renderDetail();
+  renderChecklist();
+  renderRight();
+  renderNextPlan();
+  renderFinancial();
+  renderMailSummary();
+  // show edit mode indicator
+  document.getElementById("edit-notice").classList.toggle("show", editMode);
+}
+
+/* ── SIDEBAR ── */
+function renderSidebar(){
+  const list = document.getElementById("proj-list");
+  list.innerHTML = projects.map((p,idx)=>`
+    <div class="sb-proj${p.id===activeId?" active":""}" onclick="selectProject('${p.id}')">
+      <span class="sb-dot" style="background:${p.id===activeId?"#fff":p.color}"></span>
+      <span class="sb-name">${esc(p.name)}</span>
+      <span style="display:inline-flex;flex-direction:column;gap:1px;margin-left:auto;flex-shrink:0;">
+        ${idx>0?`<button class="sb-move" title="위로" onclick="event.stopPropagation();moveProject('${p.id}',-1)">▲</button>`:`<span style="width:18px;display:inline-block;"></span>`}
+        ${idx<projects.length-1?`<button class="sb-move" title="아래로" onclick="event.stopPropagation();moveProject('${p.id}',1)">▼</button>`:`<span style="width:18px;display:inline-block;"></span>`}
+      </span>
+      ${projects.length>1?`<button class="sb-del" onclick="event.stopPropagation();deleteProject('${p.id}')">✕</button>`:""}
+    </div>
+  `).join("");
+}
+
+/* ── HEADER ── */
+function renderHeader(){
+  const d = getCurrent(); if(!d) return;
+  const m = d.meta;
+  const hdrTitle = document.getElementById("hdr-title");
+  const hdrMeta = document.getElementById("hdr-meta");
+  const hdrAct  = document.getElementById("hdr-actions");
+
+  if(editMode){
+    const sy = m.shipyard||"";
+    const hn = m.hullNum||"";
+    const pt = m.projType||"SG";
+    const preview = buildProjectTitle(m);
+    const shipyards = ["HHI","HMD","HSHI","SHI","HOC","DAESUN"];
+    const projTypes = ["SG","SITE PACKAGE","EP"];
+    hdrTitle.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <select class="hdr-ei-sel" style="font-size:13px;font-weight:700;"
+            onchange="getCurrent().meta.shipyard=this.value;applyTitleFields()">
+            <option value="">Shipyard</option>
+            ${shipyards.map(v=>`<option value="${v}"${sy===v?" selected":""}>${v}</option>`).join("")}
+          </select>
+          <input class="hdr-ei" style="width:80px;font-size:13px;font-weight:700;text-align:center"
+            placeholder="Hull No." value="${esc(hn)}"
+            oninput="getCurrent().meta.hullNum=this.value;applyTitleFields()">
+          <select class="hdr-ei-sel" style="font-size:13px;font-weight:700;"
+            onchange="getCurrent().meta.projType=this.value;applyTitleFields()">
+            ${projTypes.map(v=>`<option value="${v}"${pt===v?" selected":""}>${v}</option>`).join("")}
+          </select>
+          <span style="color:rgba(255,255,255,.45);font-size:13px;">→</span>
+          <span class="title-preview" style="font-size:16px;font-weight:800;color:#fff;">${esc(preview)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="color:rgba(255,255,255,.5);font-size:13px;">#1 ~</span>
+          <input class="hdr-ei" type="number" min="1" style="width:58px;font-size:13px;font-weight:700;text-align:center"
+            placeholder="n" value="${esc(m.seriesCount)}"
+            oninput="getCurrent().meta.seriesCount=this.value"
+            onblur="renderHeader();syncDeliveryVessels(getCurrent());renderChecklist()">
+        </div>
+      </div>`;
+    hdrMeta.innerHTML = `
+      <span><b style="color:#fecaca">PM(M):</b>
+        <select class="hdr-ei-sel" style="width:60px;margin-left:4px" onchange="getCurrent().meta.pmm=this.value">
+          <option value=""></option>
+          ${["JH","KS","HH","JI"].map(v=>`<option value="${v}"${m.pmm===v?" selected":""}>${v}</option>`).join("")}
+        </select>
+      </span>
+      <span><b style="color:#fecaca">PM(S):</b>
+        <select class="hdr-ei-sel" style="width:60px;margin-left:4px" onchange="getCurrent().meta.pms=this.value">
+          <option value=""></option>
+          ${["JH","KS","HH","JI"].map(v=>`<option value="${v}"${m.pms===v?" selected":""}>${v}</option>`).join("")}
+        </select>
+      </span>
+      <span><b style="color:#fecaca">PM(Other):</b>
+        <select class="hdr-ei-sel" style="width:80px;margin-left:4px" onchange="getCurrent().meta.pmo=this.value">
+          <option value=""></option>
+          ${["Tomic","Fisher","Allen","Leo"].map(v=>`<option value="${v}"${(m.pmo||"")===v?" selected":""}>${v}</option>`).join("")}
+        </select>
+      </span>
+      <span><b style="color:#fecaca">Owner:</b>
+        <input class="hdr-ei" style="width:110px;margin-left:4px" placeholder="Owner" value="${esc(m.owner||"")}"
+          oninput="getCurrent().meta.owner=this.value">
+      </span>
+      <span><b style="color:#fecaca">CLASS(M):</b>
+        <select class="hdr-ei-sel" style="width:70px;margin-left:4px" onchange="getCurrent().meta.classM=this.value">
+          ${["DNV","ABS","BV","KR","NONE"].map(v=>`<option value="${v}"${(m.classM||"DNV")===v?" selected":""}>${v}</option>`).join("")}
+        </select>
+      </span>
+      <span><b style="color:#fecaca">CLASS(S):</b>
+        <select class="hdr-ei-sel" style="width:70px;margin-left:4px" onchange="getCurrent().meta.classS=this.value">
+          ${["DNV","ABS","BV","KR","NONE"].map(v=>`<option value="${v}"${(m.classS||"DNV")===v?" selected":""}>${v}</option>`).join("")}
+        </select>
+      </span>`;
+    hdrAct.innerHTML = `
+      <button class="btn btn-white btn-sm" onclick="doSave()">💾 Save & Share</button>
+      <button class="btn btn-ghost active btn-sm" onclick="toggleEdit()">✕ Exit Edit</button>`;
+  } else {
+    const seriesTag = m.seriesCount ? `<span style="font-size:14px;font-weight:600;color:rgba(255,255,255,.65);margin-left:8px;">#1 ~ #${esc(m.seriesCount)}</span>` : "";
+    hdrTitle.innerHTML = `<span>${esc(m.name)||"Untitled Project"}</span>${seriesTag}`;
+    hdrMeta.innerHTML = `
+      <span><b>PM(M):</b> ${esc(m.pmm)||"—"}</span>
+      <span><b>PM(S):</b> ${esc(m.pms)||"—"}</span>
+      ${m.pmo ? `<span><b>PM(Other):</b> ${esc(m.pmo)}</span>` : ""}
+      ${m.owner ? `<span><b>Owner:</b> ${esc(m.owner)}</span>` : ""}
+      <span><b>CLASS(M):</b> ${esc(m.classM||"DNV")}</span>
+      <span><b>CLASS(S):</b> ${esc(m.classS||"DNV")}</span>`;
+    hdrAct.innerHTML = `<button class="btn btn-ghost btn-sm" onclick="toggleEdit()">✏️ Edit Mode</button>`;
+  }
+}
+
+/* ── TIMELINE ── */
+function renderTimeline(){
+  const d = getCurrent(); if(!d) return;
+  const m = d.meta;
+
+  // progress
+  document.getElementById("tl-fill").style.width = m.progress+"%";
+  const tlRight = document.getElementById("tl-right");
+  if(editMode){
+    tlRight.innerHTML = `
+      <span style="font-size:12px;color:#6b7280;font-weight:600">Overall Progress:</span>
+      <input type="number" class="ei" style="width:50px;font-size:13px" value="${m.progress}"
+        oninput="getCurrent().meta.progress=Math.min(100,Math.max(0,+this.value));document.getElementById('tl-fill').style.width=this.value+'%';document.getElementById('tl-pct-lbl').textContent='Overall: '+this.value+'%'">
+      <span style="font-size:12px;color:#6b7280;font-weight:600">%</span>
+      <span id="tl-pct-lbl" style="font-size:13px;font-weight:700;color:#C2000B">Overall: ${m.progress}%</span>`;
+  } else {
+    tlRight.innerHTML = `<span style="font-size:13px;font-weight:700;color:#C2000B">Overall: ${m.progress}%</span>`;
+  }
+
+  // stages
+  const grid = document.getElementById("stages-grid");
+  grid.style.gridTemplateColumns = `repeat(${d.stages.length},1fr)`;
+  grid.innerHTML = d.stages.map((s,i)=>{
+    const sc = stageClass(s.status);
+    const pctLabel = s.status==="done" ? "✓ 100%" : s.pct>0 ? s.pct+"%" : "–";
+    if(editMode){
+      return `<div class="${sc} stage-box" style="padding:5px 3px;">
+        <input class="ei" style="font-size:11px;margin-bottom:3px;font-weight:700" value="${esc(s.name)}"
+          oninput="getCurrent().stages[${i}].name=this.value">
+        <select class="esel" style="width:100%;font-size:11px;margin-bottom:3px"
+          onchange="getCurrent().stages[${i}].status=this.value;renderTimeline()">
+          ${opts(["done","active","delayed","planned"],s.status)}
+        </select>
+        <input type="number" class="ei" style="font-size:11px" value="${s.pct}"
+          oninput="getCurrent().stages[${i}].pct=Math.min(100,Math.max(0,+this.value))">
+      </div>`;
+    } else {
+      return `<div class="${sc} stage-box">
+        <div class="stage-dot"></div>
+        <div class="stage-name">${esc(s.name)}</div>
+        <div class="stage-pct" style="color:${s.status==="done"||s.status==="active"?"#C2000B":"#9ca3af"}">${pctLabel}</div>
+      </div>`;
+    }
+  }).join("");
+}
+
+/* ── CATS ── */
+function renderCats(){
+  const d = getCurrent(); if(!d) return;
+
+  // filter buttons
+  const filterRow = document.getElementById("filter-row");
+  if(editMode){
+    filterRow.style.display = "none";
+  } else {
+    filterRow.style.display = "flex";
+    filterRow.innerHTML = ["all","In Progress","Open","Closed"].map(f=>`
+      <button class="flt-btn${filterBy===f?" active":""}" onclick="setFilter('${f}')">${f==="all"?"All":f}</button>
+    `).join("");
+  }
+
+  // add-category button
+  document.getElementById("cats-add-btn").innerHTML = editMode
+    ? `<button class="btn btn-sm" onclick="addCat()">+ Add Category</button>` : "";
+
+  // cards
+  const cats = editMode ? d.cats : d.cats.filter(c=>
+    filterBy==="all" || c.priority===filterBy || c.status===filterBy
+  );
+  const grid = document.getElementById("cats-grid");
+  if(cats.length===0){
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:20px;color:#9ca3af;font-size:13px">No categories match this filter</div>`;
+    return;
+  }
+  grid.innerHTML = cats.map(cat=>{
+    const realIdx = d.cats.findIndex(c=>c.id===cat.id);
+    const openCnt = cat.issues.filter(i=>i.status!=="Closed").length;
+    const cntBg   = openCnt>3 ? "#C2000B" : "#EF4444";
+    const sc      = statusColor(cat.status);
+    const pCls    = {High:"H",Medium:"M",Low:"L"}[cat.priority]||"M";
+    const isSel   = selCatId===cat.id;
+
+    if(editMode){
+      return `<div class="cat-card edit-mode${isSel?" selected":""}" style="position:relative;">
+        <button class="cat-del-btn" style="display:block;" onclick="deleteCat(${realIdx})">✕</button>
+        <div class="cat-top">
+          <select class="esel" style="font-size:11px" onchange="getCurrent().cats[${realIdx}].priority=this.value;renderCats()">
+            ${opts(["High","Medium","Low"],cat.priority)}
+          </select>
+        </div>
+        <input class="ei" style="font-weight:700;margin-bottom:4px" value="${esc(cat.name)}"
+          oninput="getCurrent().cats[${realIdx}].name=this.value">
+        <select class="esel" style="width:100%;margin-bottom:4px"
+          onchange="getCurrent().cats[${realIdx}].status=this.value;renderCats()">
+          ${opts(["Open","In Progress","Closed"],cat.status)}
+        </select>
+        <input class="ei" style="font-size:11px;width:100%" value="${esc(cat.due)}" placeholder="Due"
+          oninput="getCurrent().cats[${realIdx}].due=this.value">
+      </div>`;
+    } else {
+      return `<div class="cat-card${isSel?" selected":""}" onclick="selectCat(${cat.id})">
+        <div class="cat-top">
+          <span class="badge badge-${pCls}">${cat.priority}</span>
+        </div>
+        <div class="cat-name">${esc(cat.name)}</div>
+        <div class="cat-status" style="color:${sc}">
+          <span class="cat-status-dot" style="background:${sc}"></span>${esc(cat.status)}
+        </div>
+        <div class="cat-footer">
+          <span>Due: ${esc(cat.due)||"—"}</span>
+        </div>
+      </div>`;
+    }
+  }).join("");
+}
+
+/* ── DETAIL ── */
+function renderDetail(){
+  const d = getCurrent(); if(!d) return;
+  const panel = document.getElementById("detail-panel");
+  if(!selCatId){ panel.classList.remove("show"); return; }
+  const cat = d.cats.find(c=>c.id===selCatId);
+  if(!cat){ panel.classList.remove("show"); return; }
+  panel.classList.add("show");
+
+  document.getElementById("dp-title").textContent = cat.name+" — Updates";
+  document.getElementById("dp-kpis").style.display = "none";
+
+  const catIdx = d.cats.findIndex(c=>c.id===selCatId);
+  document.getElementById("issue-thead").innerHTML = "";
+
+  const rowsHtml = cat.issues.length===0
+    ? `<tr><td colspan="2" style="text-align:center;color:#9ca3af;font-size:13px;padding:18px 0;">No updates yet</td></tr>`
+    : cat.issues.map((iss,ii)=>{
+      if(editMode){
+        return `<tr>
+          <td colspan="2">
+            <div class="upd-row edit-mode">
+              <button class="del-issue-btn upd-del-btn" onclick="deleteIssue(${catIdx},${ii})">✕</button>
+              <input class="ei" style="width:120px;font-size:12px" value="${esc(iss.date)}" placeholder="Updated date"
+                oninput="getCurrent().cats[${catIdx}].issues[${ii}].date=this.value">
+              <input class="ei upd-desc-input" value="${esc(iss.desc)}" placeholder="Description"
+                oninput="getCurrent().cats[${catIdx}].issues[${ii}].desc=this.value">
+              <div class="upd-photo-area">
+                ${iss.photo ? `<img class="upd-photo-preview" src="${iss.photo}" onclick="openLightbox('${iss.photo}')">` : ""}
+                <label class="btn btn-sm upd-photo-btn">${iss.photo?"Change Photo":"+ Add Photo"}
+                  <input type="file" accept="image/*" style="display:none" onchange="handleUpdatePhoto(${catIdx},${ii},this)">
+                </label>
+              </div>
+            </div>
+          </td>
+        </tr>`;
+      } else {
+        return `<tr>
+          <td colspan="2">
+            <div class="upd-row">
+              <div class="upd-date">${esc(iss.date)||"—"}</div>
+              <div class="upd-desc">${esc(iss.desc)||"—"}</div>
+              ${iss.photo ? `<img class="upd-photo-preview" src="${iss.photo}" onclick="openLightbox('${iss.photo}')">` : ""}
+            </div>
+          </td>
+        </tr>`;
+      }
+    }).join("");
+
+  document.getElementById("issue-tbody").innerHTML = rowsHtml;
+
+  document.getElementById("add-issue-btn").innerHTML = editMode
+    ? `<button class="btn btn-sm" onclick="addIssue(${catIdx})">+ Add Update</button>` : "";
+}
+
+/* ── DELIVERY / GR / IR CHECKLIST ── */
+// Migrate older flat-item data (saved before categories existed) into a single default group
+function migrateChecklist(d){
+  if(!d.deliveryChecklist){ d.deliveryChecklist = []; return; }
+  const list = d.deliveryChecklist;
+  if(list.length && list[0] && !("items" in list[0])){
+    d.deliveryChecklist = [{id:Date.now(), name:"General", collapsed:false, items:list}];
+  }
+}
+
+function toggleChecklistCardCollapse(){
+  checklistCardCollapsed = !checklistCardCollapsed;
+  renderChecklist();
+}
+
+function vesselNameFromIndex(hullNum, idx){
+  const base = parseInt(hullNum);
+  if(!isNaN(base) && base > 0) return String(base + idx);
+  return hullNum ? `${hullNum}-${idx+1}` : `Vessel #${idx+1}`;
+}
+
+function syncDeliveryVessels(d){
+  const count = parseInt(d.meta.seriesCount)||0;
+  if(!count) return; // no series mode: leave checklist as-is
+  const hullNum = (d.meta.hullNum||"").trim();
+  if(!d.deliveryChecklist) d.deliveryChecklist = [];
+
+  for(let i=0; i<count; i++){
+    const name = vesselNameFromIndex(hullNum, i);
+    if(d.deliveryChecklist[i]){
+      // always keep name in sync with hull/series settings
+      d.deliveryChecklist[i].name = name;
+    } else {
+      d.deliveryChecklist.push({
+        id: Date.now()+i,
+        name,
+        collapsed: false,
+        poNumber: "",
+        soNumber: "",
+        items: defaultChecklistItems()
+      });
+    }
+  }
+}
+
+function renderChecklist(){
+  const d = getCurrent(); if(!d) return;
+  migrateChecklist(d);
+  syncDeliveryVessels(d);
+  const groups = d.deliveryChecklist;
+  const el = document.getElementById("checklist-card");
+
+  const groupsHtml = groups.length
+    ? groups.map((g,gi)=>renderChecklistGroup(g,gi)).join("")
+    : `<div style="padding:10px 0;text-align:center;color:#9ca3af;font-size:13px">No vessels yet</div>`;
+
+  const addGroupBtn = editMode
+    ? `<button class="btn btn-sm chk-add-grp-btn" onclick="addChecklistGroup()">+ Add Vessel</button>` : "";
+
+  el.innerHTML = `
+    <div class="chk-hdr" style="justify-content:space-between;cursor:pointer;" onclick="toggleChecklistCardCollapse()">
+      <span class="sec-lbl" style="margin-bottom:0;display:flex;align-items:center;gap:6px;">
+        <span class="chk-chevron">${checklistCardCollapsed?"▸":"▾"}</span>DELIVERY / GR / IR STATUS
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;" onclick="event.stopPropagation()">
+        <span style="font-size:11px;color:#9ca3af;font-weight:700;">INCOTERMS</span>
+        <select class="esel" style="width:auto;font-size:11px;font-weight:700;"
+          onchange="getCurrent().incoterms=this.value;renderChecklist()">
+          ${opts(["EXW","FCA","FOB","FAS","CFR","CIF","CPT","CIP","DAP","DPU","DDP"], d.incoterms||"FOB")}
+        </select>
+      </span>
+    </div>
+    ${checklistCardCollapsed ? "" : `<div class="chk-body">${groupsHtml}${addGroupBtn}</div>`}`;
+}
+
+function renderChecklistGroup(g, gi){
+  const nameHtml = editMode
+    ? `<input class="ei chk-grp-name-input" value="${esc(g.name)}" onclick="event.stopPropagation()"
+        oninput="getCurrent().deliveryChecklist[${gi}].name=this.value">`
+    : `<span class="chk-grp-name">${esc(g.name)||"Untitled"}</span>`;
+  const delGroupBtn = editMode
+    ? `<button class="chk-grp-del" onclick="event.stopPropagation();deleteChecklistGroup(${gi})">✕</button>` : "";
+
+  const poSoHtml = `<span class="chk-grp-poso" onclick="event.stopPropagation()">
+        <input class="ei chk-poso-input" placeholder="PO No." value="${esc(g.poNumber)}"
+          oninput="getCurrent().deliveryChecklist[${gi}].poNumber=this.value">
+        <input class="ei chk-poso-input" placeholder="SO No." value="${esc(g.soNumber)}"
+          oninput="getCurrent().deliveryChecklist[${gi}].soNumber=this.value">
+      </span>`;
+
+  let itemsHtml = "";
+  if(!g.collapsed){
+    if(!g.items.length){
+      itemsHtml = `<div style="padding:8px 0;text-align:center;color:#9ca3af;font-size:13px">No items yet</div>`;
+    } else {
+      const cellBtn = (val,field,ii)=>{
+        const isO = val==="O";
+        return `<button class="chk-toggle ${isO?"chk-o":"chk-x"}" onclick="toggleChecklistCell(${gi},${ii},'${field}')">${val||"X"}</button>`;
+      };
+      const dateField = (val,field,ii)=>
+        `<input class="ei chk-date-input" placeholder="Date" value="${esc(val)}"
+            oninput="getCurrent().deliveryChecklist[${gi}].items[${ii}].${field}=this.value">`;
+      const numField = (val,field,ii)=>
+        `<input type="number" class="ei chk-num-input" value="${val===undefined||val===null||val===""?"":esc(val)}"
+            oninput="getCurrent().deliveryChecklist[${gi}].items[${ii}].${field}=this.value">`;
+
+      const incoterms = (getCurrent().incoterms || "FOB").toUpperCase();
+      const showShippingDoc = incoterms !== "DDP";
+      const showCustoms     = incoterms !== "DAP";
+      const showBondCert    = incoterms === "DAP"; // 보세필증
+
+      const ORIGIN_THRESHOLDS = {CN:14, EU:90, KR:7};
+
+      function parseDateOnly(dateStr){
+        if(!dateStr) return null;
+        const d = new Date(dateStr);
+        if(isNaN(d.getTime())) return null;
+        d.setHours(0,0,0,0);
+        return d;
+      }
+
+      // TODAY is recalculated live on every render
+      const todayDate = new Date(); todayDate.setHours(0,0,0,0);
+
+      const rows = g.items.map((it,ii)=>{
+        const nameCell = editMode
+          ? `<input class="ei" value="${esc(it.name)}" oninput="getCurrent().deliveryChecklist[${gi}].items[${ii}].name=this.value">`
+          : `<span>${esc(it.name)||"—"}</span>`;
+        const delCell = editMode ? `<button class="del-issue-btn" onclick="deleteChecklistItem(${gi},${ii})">✕</button>` : "";
+        const rowCls = it.delivery==="O" ? "chk-row-done" : "";
+
+        // Warning: Site Required Date - TODAY vs threshold
+        const origin = it.origin||"CN";
+        const threshold = ORIGIN_THRESHOLDS[origin]??14;
+        const siteDate = parseDateOnly(it.siteRequiredDate);
+        const daysLeft = siteDate ? Math.floor((siteDate - todayDate) / (1000*60*60*24)) : null;
+        const warn = daysLeft!==null && daysLeft<=threshold && it.delivery!=="O";
+        const overdue = warn && daysLeft<0;
+        const warnTitle = daysLeft!==null
+          ? (overdue ? `D+${Math.abs(daysLeft)} 초과! (${origin} 기준 ${threshold}일 이하 경고)` : `D-${daysLeft} 남음 (${origin} 기준 ${threshold}일 이하 경고)`)
+          : "Site Required Date 미입력";
+        const warnCell = warn
+          ? `<td class="chk-warn-cell" title="${warnTitle}"><span class="chk-warn-badge${overdue?" chk-warn-overdue":""}">${overdue?"OVER":"D-"+daysLeft}</span></td>`
+          : `<td class="chk-warn-cell"></td>`;
+
+        const originCell = `<td class="chk-cell">
+          <select class="esel" style="font-size:11px;padding:1px 3px;"
+            onchange="getCurrent().deliveryChecklist[${gi}].items[${ii}].origin=this.value;renderChecklist()">
+            ${["CN","EU","KR"].map(v=>`<option value="${v}"${origin===v?" selected":""}>${v}</option>`).join("")}
+          </select>
+        </td>`;
+
+        return `<tr class="${rowCls}">
+          ${warnCell}
+          <td class="chk-num-cell">${numField(it.itemNo,"itemNo",ii)}</td>
+          <td class="chk-name-cell">${nameCell}</td>
+          ${originCell}
+          <td class="chk-date-cell">${dateField(it.siteRequiredDate,"siteRequiredDate",ii)}</td>
+          <td class="chk-date-cell">${dateField(it.etaPort||"","etaPort",ii)}</td>
+          ${showShippingDoc ? `<td class="chk-cell">${cellBtn(it.shippingDoc,"shippingDoc",ii)}</td>` : ""}
+          ${showCustoms     ? `<td class="chk-cell">${cellBtn(it.customs,"customs",ii)}</td>` : ""}
+          ${showBondCert    ? `<td class="chk-cell">${cellBtn(it.bondCert||"X","bondCert",ii)}</td>` : ""}
+          <td class="chk-cell">${cellBtn(it.delivery,"delivery",ii)}</td>
+          <td class="chk-date-cell">${dateField(it.deliveryDate,"deliveryDate",ii)}</td>
+          <td class="chk-cell">${cellBtn(it.gr,"gr",ii)}</td>
+          <td class="chk-date-cell">${dateField(it.grDate,"grDate",ii)}</td>
+          <td class="chk-cell">${cellBtn(it.ir,"ir",ii)}</td>
+          <td class="chk-cell"><button class="btn btn-sm chk-mail-btn" title="GR 요청 메일 보내기" onclick="requestGrEmail(${gi},${ii})">✉️ GR</button></td>
+          <td class="chk-cell"><button class="btn btn-sm chk-mail-btn" title="IR 요청 메일 보내기" onclick="requestIrEmail(${gi},${ii})" style="background:#1D4ED8;">✉️ IR</button></td>
+          <td class="chk-del-cell">${delCell}</td>
+        </tr>`;
+      }).join("");
+
+      const theadCols = [
+        `<th class="chk-warn-col"></th>`,
+        `<th class="chk-col">Item No</th>`,
+        `<th>Item</th>`,
+        `<th class="chk-col">Origin</th>`,
+        `<th class="chk-col">Site Required Date</th>`,
+        `<th class="chk-col">ETA PORT</th>`,
+        showShippingDoc ? `<th class="chk-col">Shipping Doc</th>` : "",
+        showCustoms     ? `<th class="chk-col">Customs</th>` : "",
+        showBondCert    ? `<th class="chk-col">보세필증</th>` : "",
+        `<th class="chk-col">Delivery</th>`,
+        `<th class="chk-col">Date</th>`,
+        `<th class="chk-col">GR</th>`,
+        `<th class="chk-col">Date</th>`,
+        `<th class="chk-col">IR</th>`,
+        `<th class="chk-col">GR Request</th>`,
+        `<th class="chk-col">IR Request</th>`,
+        `<th></th>`,
+      ].join("");
+
+      itemsHtml = `<div style="overflow-x:auto;"><table class="chk-tbl">
+        <thead><tr>${theadCols}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+    }
+  }
+
+  const addItemBtn = (!g.collapsed && editMode)
+    ? `<button class="btn btn-sm" style="margin-top:6px" onclick="addChecklistItem(${gi})">+ Add Item</button>` : "";
+
+  return `<div class="chk-grp">
+    <div class="chk-grp-hdr" onclick="toggleChecklistGroupCollapse(${gi})">
+      <span class="chk-chevron">${g.collapsed?"▸":"▾"}</span>
+      ${nameHtml}
+      ${poSoHtml}
+      <button class="btn btn-sm" style="flex-shrink:0;background:#7C3AED;font-size:11px;padding:2px 8px;"
+        title="Invoice Request 메일 보내기"
+        onclick="event.stopPropagation();requestInvoiceEmail(${gi})">📄 Invoice Req.</button>
+      ${delGroupBtn}
+    </div>
+    ${!g.collapsed ? `<div class="chk-grp-body">${itemsHtml}${addItemBtn}</div>` : ""}
+  </div>`;
+}
+
+function toggleChecklistGroupCollapse(gi){
+  const g = getCurrent().deliveryChecklist[gi];
+  g.collapsed = !g.collapsed;
+  renderChecklist();
+}
+
+function defaultChecklistItems(){
+  const mk = (name, itemNo) => ({
+    id: Date.now()+Math.floor(Math.random()*100000),
+    name, itemNo, siteRequiredDate:"", etaPort:"", origin:"CN",
+    shippingDoc:"X", customs:"X", delivery:"X", deliveryDate:"",
+    gr:"X", grDate:"", ir:"X"
+  });
+  return [
+    mk("DP", "10"),
+    mk("SG", "20"),
+    mk("DRIVE", "30"),
+    mk("TR", "40"),
+    mk("ACC", "50"),
+    mk("Spare", "60"),
+    mk("Chock", ""),
+  ];
+}
+
+function addChecklistGroup(){
+  const list = getCurrent().deliveryChecklist || (getCurrent().deliveryChecklist = []);
+  list.push({id:Date.now(), name:"New Vessel", collapsed:false, poNumber:"", soNumber:"", items: defaultChecklistItems()});
+  renderChecklist();
+}
+
+function deleteChecklistGroup(gi){
+  if(!confirm("Delete this category and all its items?")) return;
+  getCurrent().deliveryChecklist.splice(gi,1);
+  renderChecklist();
+}
+
+function toggleChecklistCell(gi, ii, field){
+  const it = getCurrent().deliveryChecklist[gi].items[ii];
+  it[field] = it[field]==="O" ? "X" : "O";
+  renderChecklist();
+}
+
+function addChecklistItem(gi){
+  const g = getCurrent().deliveryChecklist[gi];
+  g.items.push({id:Date.now(), name:"New Item", itemNo:"", siteRequiredDate:"", etaPort:"", origin:"CN", shippingDoc:"X", customs:"X", delivery:"X", deliveryDate:"", gr:"X", grDate:"", ir:"X"});
+  renderChecklist();
+}
+
+function deleteChecklistItem(gi, ii){
+  getCurrent().deliveryChecklist[gi].items.splice(ii,1);
+  renderChecklist();
+}
+
+let grModalGi = null, grModalIi = null;
+const GR_DEFAULT_TO = "kr-marine.purchasing@abb.com";
+const GR_DEFAULT_CC = "shamali.khairnar@in.abb.com, kanchan.sankangoudar@in.abb.com, ji-in.jeong@kr.abb.com";
+
+function buildGrMailDefault(gi, ii){
+  const d = getCurrent();
+  const grp = d.deliveryChecklist[gi];
+  const it = grp.items[ii];
+  const itemNumber = it.itemNo||"-";
+  const subject = `GR Request - PO ${grp.poNumber||"-"} / Item ${itemNumber}`;
+  const bodyLines = [
+    "Dear Marine Purchasing Korea,",
+    "",
+    "Could you please update the delivery date and post GR for below item?",
+    `PO ${grp.poNumber||"-"} / Item ${itemNumber}`,
+    "",
+    "Thank you,"
+  ];
+  return {subject, body: bodyLines.join("\n")};
+}
+
+function requestGrEmail(gi, ii){
+  grModalGi = gi; grModalIi = ii;
+  const it = getCurrent().deliveryChecklist[gi].items[ii];
+  if(!it.grEmail) it.grEmail = GR_DEFAULT_TO;
+  if(!it.grCc) it.grCc = GR_DEFAULT_CC;
+  // Keep regenerating the subject/body from the current PO/Item No/etc. every time,
+  // unless the user has manually edited the text themselves (grCustomized).
+  if(!it.grCustomized){
+    const def = buildGrMailDefault(gi, ii);
+    it.grSubject = def.subject;
+    it.grBody = def.body;
+  }
+  document.getElementById("gr-mail-to").value = it.grEmail||"";
+  document.getElementById("gr-mail-cc").value = it.grCc||"";
+  document.getElementById("gr-mail-subject").value = it.grSubject||"";
+  document.getElementById("gr-mail-body").value = it.grBody||"";
+  document.getElementById("gr-mail-modal").classList.add("show");
+}
+
+function saveGrMailField(field, value){
+  if(grModalGi===null) return;
+  const it = getCurrent().deliveryChecklist[grModalGi].items[grModalIi];
+  it[field] = value;
+  if(field==="grSubject" || field==="grBody") it.grCustomized = true;
+}
+
+function resetGrMailDefault(){
+  if(grModalGi===null) return;
+  const def = buildGrMailDefault(grModalGi, grModalIi);
+  const it = getCurrent().deliveryChecklist[grModalGi].items[grModalIi];
+  it.grEmail = GR_DEFAULT_TO;
+  it.grCc = GR_DEFAULT_CC;
+  it.grSubject = def.subject;
+  it.grBody = def.body;
+  it.grCustomized = false;
+  document.getElementById("gr-mail-to").value = it.grEmail;
+  document.getElementById("gr-mail-cc").value = it.grCc;
+  document.getElementById("gr-mail-subject").value = def.subject;
+  document.getElementById("gr-mail-body").value = def.body;
+}
+
+function sendGrMailNow(){
+  if(grModalGi===null) return;
+  const it = getCurrent().deliveryChecklist[grModalGi].items[grModalIi];
+  const email = (it.grEmail||"").trim();
+  if(!email){ alert("받는 사람 이메일을 입력해주세요."); return; }
+  const cc = (it.grCc||"").trim();
+  let mailto = `mailto:${email}?subject=${encodeURIComponent(it.grSubject||"")}&body=${encodeURIComponent(it.grBody||"")}`;
+  if(cc) mailto += `&cc=${encodeURIComponent(cc)}`;
+  window.location.href = mailto;
+  closeGrMailModal();
+}
+
+function closeGrMailModal(){
+  document.getElementById("gr-mail-modal").classList.remove("show");
+  grModalGi = null; grModalIi = null;
+}
+
+/* ── IR REQUEST MAIL ── */
+const IR_DEFAULT_TO = "kr-abb-sasscanning@abb.com, verna-shuyao.lin@cn.abb.com";
+const IR_DEFAULT_CC = "mandy-lie.zheng@cn.abb.com";
+let irModalGi = null, irModalIi = null;
+
+function buildIrMailDefault(gi, ii){
+  const d = getCurrent();
+  const grp = d.deliveryChecklist[gi];
+  const it = grp.items[ii];
+  const po = grp.poNumber||"-";
+  const itemNo = it.itemNo||"-";
+  const subject = `IR Request : PO ${po}`;
+  const body = [
+    "Dear KRABB Scanning team,",
+    "",
+    "Please refer to the attached invoices and",
+    `kindly proceed with the IR processing for the projects listed below. PO no: ${po}, item: ${itemNo}`
+  ].join("\n");
+  return {subject, body};
+}
+
+function requestIrEmail(gi, ii){
+  irModalGi = gi; irModalIi = ii;
+  const it = getCurrent().deliveryChecklist[gi].items[ii];
+  if(!it.irEmail) it.irEmail = IR_DEFAULT_TO;
+  if(!it.irCc) it.irCc = IR_DEFAULT_CC;
+  if(!it.irCustomized){
+    const def = buildIrMailDefault(gi, ii);
+    it.irSubject = def.subject;
+    it.irBody = def.body;
+  }
+  document.getElementById("ir-mail-to").value = it.irEmail||"";
+  document.getElementById("ir-mail-cc").value = it.irCc||"";
+  document.getElementById("ir-mail-subject").value = it.irSubject||"";
+  document.getElementById("ir-mail-body").value = it.irBody||"";
+  document.getElementById("ir-mail-modal").classList.add("show");
+}
+
+function saveIrMailField(field, value){
+  if(irModalGi===null) return;
+  const it = getCurrent().deliveryChecklist[irModalGi].items[irModalIi];
+  it[field] = value;
+  if(field==="irSubject"||field==="irBody") it.irCustomized = true;
+}
+
+function resetIrMailDefault(){
+  if(irModalGi===null) return;
+  const def = buildIrMailDefault(irModalGi, irModalIi);
+  const it = getCurrent().deliveryChecklist[irModalGi].items[irModalIi];
+  it.irEmail = IR_DEFAULT_TO;
+  it.irCc = IR_DEFAULT_CC;
+  it.irSubject = def.subject;
+  it.irBody = def.body;
+  it.irCustomized = false;
+  document.getElementById("ir-mail-to").value = it.irEmail;
+  document.getElementById("ir-mail-cc").value = it.irCc;
+  document.getElementById("ir-mail-subject").value = def.subject;
+  document.getElementById("ir-mail-body").value = def.body;
+}
+
+function sendIrMailNow(){
+  if(irModalGi===null) return;
+  const it = getCurrent().deliveryChecklist[irModalGi].items[irModalIi];
+  const email = (it.irEmail||"").trim();
+  if(!email){ alert("받는 사람 이메일을 입력해주세요."); return; }
+  const cc = (it.irCc||"").trim();
+  let mailto = `mailto:${email}?subject=${encodeURIComponent(it.irSubject||"")}&body=${encodeURIComponent(it.irBody||"")}`;
+  if(cc) mailto += `&cc=${encodeURIComponent(cc)}`;
+  window.location.href = mailto;
+  closeIrMailModal();
+}
+
+function closeIrMailModal(){
+  document.getElementById("ir-mail-modal").classList.remove("show");
+  irModalGi = null; irModalIi = null;
+}
+
+/* ── INVOICE REQUEST MAIL (vessel-level) ── */
+const INV_DEFAULT_TO = "mandy-lie.zheng@cn.abb.com";
+let invModalGi = null;
+
+function buildInvoiceMailDefault(gi){
+  const d = getCurrent();
+  const grp = d.deliveryChecklist[gi];
+  const po = grp.poNumber||"-";
+  const pmo = (d.meta.pmo||"-");
+  const subject = `Invoice Request - PO ${po}`;
+  const body = [
+    "Dear Mandy,",
+    "",
+    "Could you please send the invoice for below projects? We need this document for the IR & GR process.",
+    `PO: ${po}, PM: ${pmo}, ITEM: SG/DRIVE/TR/ACC.`
+  ].join("\n");
+  return {subject, body};
+}
+
+function requestInvoiceEmail(gi){
+  invModalGi = gi;
+  const grp = getCurrent().deliveryChecklist[gi];
+  if(!grp.invEmail) grp.invEmail = INV_DEFAULT_TO;
+  if(!grp.invCustomized){
+    const def = buildInvoiceMailDefault(gi);
+    grp.invSubject = def.subject;
+    grp.invBody = def.body;
+  }
+  document.getElementById("inv-mail-to").value = grp.invEmail||"";
+  document.getElementById("inv-mail-cc").value = grp.invCc||"";
+  document.getElementById("inv-mail-subject").value = grp.invSubject||"";
+  document.getElementById("inv-mail-body").value = grp.invBody||"";
+  document.getElementById("inv-mail-modal").classList.add("show");
+}
+
+function saveInvoiceMailField(field, value){
+  if(invModalGi===null) return;
+  const grp = getCurrent().deliveryChecklist[invModalGi];
+  grp[field] = value;
+  if(field==="invSubject"||field==="invBody") grp.invCustomized = true;
+}
+
+function resetInvoiceMailDefault(){
+  if(invModalGi===null) return;
+  const def = buildInvoiceMailDefault(invModalGi);
+  const grp = getCurrent().deliveryChecklist[invModalGi];
+  grp.invEmail = INV_DEFAULT_TO;
+  grp.invCc = "";
+  grp.invSubject = def.subject;
+  grp.invBody = def.body;
+  grp.invCustomized = false;
+  document.getElementById("inv-mail-to").value = grp.invEmail;
+  document.getElementById("inv-mail-cc").value = "";
+  document.getElementById("inv-mail-subject").value = def.subject;
+  document.getElementById("inv-mail-body").value = def.body;
+}
+
+function sendInvoiceMailNow(){
+  if(invModalGi===null) return;
+  const grp = getCurrent().deliveryChecklist[invModalGi];
+  const email = (grp.invEmail||"").trim();
+  if(!email){ alert("받는 사람 이메일을 입력해주세요."); return; }
+  const cc = (document.getElementById("inv-mail-cc").value||"").trim();
+  let mailto = `mailto:${email}?subject=${encodeURIComponent(grp.invSubject||"")}&body=${encodeURIComponent(grp.invBody||"")}`;
+  if(cc) mailto += `&cc=${encodeURIComponent(cc)}`;
+  window.location.href = mailto;
+  closeInvoiceMailModal();
+}
+
+function closeInvoiceMailModal(){
+  document.getElementById("inv-mail-modal").classList.remove("show");
+  invModalGi = null;
+}
+
+/* ── MAIL SUMMARY (Power Automate appends to mailSummary[]) ── */
+function escapeHtml(value){ return esc(value); }
+
+function getRiskClass(riskLevel, prefix){
+  const p = prefix || "mail-risk-";
+  const v = String(riskLevel||"").trim().toLowerCase();
+  if(v==="red") return p+"red";
+  if(v==="amber") return p+"amber";
+  if(v==="green") return p+"green";
+  return "";
+}
+
+function mailPriorityCls(p){
+  return {Critical:"C",High:"H",Medium:"M",Low:"L"}[p] || "M";
+}
+
+function formatDateTime(value){
+  if(!value) return "—";
+  const d = new Date(value);
+  if(isNaN(d.getTime())) return escapeHtml(value);
+  return d.toLocaleString("ko-KR", {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+}
+
+function renderMailSummary(data){
+  const list = (data !== undefined ? data : mailSummary) || [];
+  const el = document.getElementById("mail-summary-list");
+  const updatedEl = document.getElementById("mail-last-updated");
+  if(!el) return;
+
+  const sorted = [...list].sort((a,b)=> new Date(b.receivedDateTime||0) - new Date(a.receivedDateTime||0));
+  const top20 = sorted.slice(0,20);
+
+  if(!top20.length){
+    el.innerHTML = `<div class="mail-empty">아직 요약된 메일이 없습니다.</div>`;
+    if(updatedEl) updatedEl.textContent = "";
+    return;
+  }
+
+  el.innerHTML = top20.map(m=>{
+    const riskCls = getRiskClass(m.risk_level);
+    const prioCls = mailPriorityCls(m.priority);
+    const replyYes = String(m.reply_required||"").trim().toLowerCase()==="yes";
+    return `<div class="mail-card ${riskCls}">
+      <div class="mail-card-top">
+        <span class="badge badge-${prioCls}">${escapeHtml(m.priority)||"—"}</span>
+        <span class="mail-project">${escapeHtml(m.project)||"—"}</span>
+        <span class="mail-time">${formatDateTime(m.receivedDateTime)}</span>
+      </div>
+      <div class="mail-subject">${escapeHtml(m.subject)||"(No subject)"}</div>
+      <div class="mail-summary-text">${escapeHtml(m.summary_ko)}</div>
+      <div class="mail-meta-row"><b>Action Required:</b> ${escapeHtml(m.action_required)||"—"}</div>
+      <div class="mail-foot-row">
+        <span>🏢 ${escapeHtml(m.customer_or_shipyard)||"—"}</span>
+        <span>✉️ ${escapeHtml(m.from)||"—"}</span>
+        <span class="${replyYes?"mail-reply-yes":"mail-reply-no"}">↩ Reply required: ${escapeHtml(m.reply_required)||"—"}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  if(updatedEl){
+    updatedEl.textContent = `Latest: ${formatDateTime(top20[0].receivedDateTime)} · showing ${top20.length} of ${list.length}`;
+  }
+}
+
+/* ── RIGHT PANEL ── */
+function renderRight(){
+  const d = getCurrent(); if(!d) return;
+  const m = d.meta;
+  const rs = riskStyle(m.risk);
+
+  // KPI
+  const openCatCount = d.cats.filter(c=>c.status!=="Closed").length;
+  const kpiRow = document.getElementById("kpi-row");
+  const riskContent = editMode
+    ? `<select class="esel" style="background:rgba(255,255,255,.25);color:#fff;border:1.5px solid rgba(255,255,255,.4);font-size:13px;font-weight:700;width:100%"
+        onchange="getCurrent().meta.risk=this.value;renderRight()">${opts(["RED","AMBER","GREEN"],m.risk)}</select>`
+    : `<div class="risk-val" style="color:${rs.c}">⚠ ${m.risk}</div>`;
+  kpiRow.innerHTML = `
+    <div class="kpi-box"><div class="kpi-val">${openCatCount}</div><div class="kpi-lbl">Open Categories</div></div>
+    <div class="risk-box" style="background:${rs.bg}">
+      ${riskContent}
+      <div class="risk-lbl" style="color:${rs.c}">Overall Risk</div>
+    </div>`;
+
+  // summary sections
+  const secs = [
+    {id:"sum-criticals",key:"criticals",label:"Top critical issues",icon:"🔴",hbg:"#FEF2F2",hc:"#C2000B",hbd:"#FCA5A5",ac:"#C2000B"},
+    {id:"sum-actions",  key:"actions",  label:"Required action",    icon:"⚡",hbg:"#FFFBEB",hc:"#92400E",hbd:"#FCD34D",ac:"#92400E"},
+  ];
+  secs.forEach(sec=>{
+    const items = d.summary[sec.key]||[];
+    const el = document.getElementById(sec.id);
+    let body = items.map((item,ii)=>`
+      <div class="sum-item">
+        <span class="sum-arrow" style="color:${sec.ac}">▸</span>
+        ${editMode
+          ? `<input class="sum-ei" value="${esc(item)}"
+              oninput="getCurrent().summary['${sec.key}'][${ii}]=this.value">
+             <button class="sum-del" onclick="removeSumItem('${sec.key}',${ii})">✕</button>`
+          : `<span class="sum-text">${esc(item)}</span>`}
+      </div>`).join("");
+    if(editMode) body += `<button class="btn btn-sm" style="background:${sec.hc};margin-top:6px"
+      onclick="addSumItem('${sec.key}')">+ Add Item</button>`;
+    el.innerHTML = `
+      <div class="sum-hdr" style="background:${sec.hbg};color:${sec.hc};border-color:${sec.hbd}">${sec.icon} ${sec.label}</div>
+      <div class="sum-body">${body}</div>`;
+  });
+}
+
+/* ── NEXT MONTH PLAN (top of right column) ── */
+function renderNextPlan(){
+  const d = getCurrent(); if(!d) return;
+  const m = d.meta;
+  const el = document.getElementById("next-plan-card");
+  const npContent = editMode
+    ? `<input class="hdr-ei" style="background:rgba(255,255,255,.2);font-size:12px;width:100%;text-align:center" value="${esc(m.nextplan)}"
+        oninput="getCurrent().meta.nextplan=this.value">`
+    : `<div class="foot-val">${esc(m.nextplan)||"—"}</div>`;
+  el.innerHTML = `
+    <div class="foot-card" style="background:#D97706">
+      <div class="foot-lbl" style="color:#fef3c7">NEXT MONTH PLAN</div>${npContent}
+    </div>`;
+}
+
+/* ── FINANCIAL: VO (Variation Order) contract value history ── */
+const CURRENCY_SYMBOLS = {USD:"$", EUR:"€", KRW:"₩", JPY:"¥", GBP:"£", CNY:"¥"};
+
+// Ensure d.seriesFinancial has the right number of entries
+function ensureSeriesFinancial(d){
+  const count = Math.max(1, parseInt(d.meta.seriesCount)||0);
+  if(!d.seriesFinancial) d.seriesFinancial = [];
+  while(d.seriesFinancial.length < count){
+    // migrate existing summary data into first slot when first created
+    if(d.seriesFinancial.length===0 && d.summary.voHistory && d.summary.voHistory.length){
+      d.seriesFinancial.push({
+        voHistory: JSON.parse(JSON.stringify(d.summary.voHistory)),
+        decisions: JSON.parse(JSON.stringify(d.summary.decisions||[])),
+        currency: d.summary.currency||"USD"
+      });
+    } else {
+      d.seriesFinancial.push({voHistory:[], decisions:[], currency: d.seriesFinancial[0]?.currency||"USD"});
+    }
+  }
+  return d.seriesFinancial;
+}
+
+// Returns the financial object for the currently selected series (or series 0 for ALL view)
+function getActiveFinancial(d){
+  const count = parseInt(d.meta.seriesCount)||0;
+  if(!count) return d.summary; // no series mode — use legacy summary
+  ensureSeriesFinancial(d);
+  const idx = selFinancialIdx===-1 ? 0 : selFinancialIdx;
+  return d.seriesFinancial[Math.min(idx, d.seriesFinancial.length-1)];
+}
+
+// Applies fn to just the selected series, or ALL series when selFinancialIdx===-1
+function applyToFinancial(fn){
+  const d = getCurrent();
+  const count = parseInt(d.meta.seriesCount)||0;
+  if(!count){ fn(d.summary, -1); return; }
+  ensureSeriesFinancial(d);
+  if(selFinancialIdx===-1){
+    d.seriesFinancial.forEach((sf,i)=>fn(sf,i));
+  } else {
+    fn(d.seriesFinancial[selFinancialIdx], selFinancialIdx);
+  }
+}
+
+function currencySymbol(){
+  const d = getCurrent();
+  const sf = getActiveFinancial(d);
+  const code = (sf && sf.currency) || "USD";
+  return CURRENCY_SYMBOLS[code] || (code+" ");
+}
+function fmtMoney(n){ return currencySymbol() + (Number(n)||0).toLocaleString("en-US"); }
+function fmtSigned(n){
+  const v = Number(n)||0;
+  const sign = v>0 ? "+" : v<0 ? "-" : "";
+  return sign + currencySymbol() + Math.abs(v).toLocaleString("en-US");
+}
+
+function renderFinancial(){
+  const d = getCurrent(); if(!d) return;
+  const el = document.getElementById("sum-decisions");
+  const seriesCount = parseInt(d.meta.seriesCount)||0;
+
+  // Build series dropdown if seriesCount is set
+  let seriesDropdown = "";
+  if(seriesCount > 0){
+    ensureSeriesFinancial(d);
+    const seriesOpts = `<option value="-1"${selFinancialIdx===-1?" selected":""}>ALL</option>`
+      + Array.from({length:seriesCount},(_,i)=>`<option value="${i}"${selFinancialIdx===i?" selected":""}>#${i+1}</option>`).join("");
+    const allNote = selFinancialIdx===-1 && editMode ? `<span style="font-size:10px;color:#059669;font-weight:700;margin-left:6px;">✎ 전체 적용</span>` : "";
+    seriesDropdown = `<span style="display:flex;align-items:center;gap:5px;">
+      <span style="font-size:10px;color:#065F46;font-weight:700;">VESSEL</span>
+      <select class="esel" style="width:auto;font-size:11px;font-weight:700;color:#065F46;border-color:#86EFAC"
+        onchange="selFinancialIdx=+this.value;renderFinancial()">
+        ${seriesOpts}
+      </select>${allNote}
+    </span>`;
+  }
+
+  const sf = getActiveFinancial(d);
+  const list = sf.voHistory || (sf.voHistory = []);
+  const items = sf.decisions || (sf.decisions = []);
+
+  // In ALL view mode: show summary table of all series contract values
+  if(seriesCount > 0 && selFinancialIdx===-1 && !editMode){
+    ensureSeriesFinancial(d);
+    const rows = d.seriesFinancial.slice(0,seriesCount).map((s,i)=>{
+      const vh = s.voHistory||[];
+      const init = Number(s.baseValue)||0;
+      const diff = vh.reduce((sum,v)=>sum+((Number(v.after)||0)-(Number(v.before)||0)), 0);
+      const cur = init + diff;
+      const sym = CURRENCY_SYMBOLS[s.currency||"USD"]||(s.currency+" ");
+      const dClr = diff>0?"#059669":diff<0?"#C2000B":"#6b7280";
+      return `<div style="flex:1;min-width:110px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;text-align:center;">
+        <div style="font-size:10px;font-weight:700;color:#9ca3af;margin-bottom:4px;">#${i+1}</div>
+        <div style="font-size:17px;font-weight:800;color:#065F46;">${(init||vh.length)?sym+(cur).toLocaleString("en-US"):"—"}</div>
+        <div style="font-size:10px;color:${dClr};font-weight:600;margin-top:2px;">${diff!==0?(diff>0?"+":"")+sym+Math.abs(diff).toLocaleString("en-US"):""}</div>
+      </div>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="sum-hdr" style="background:#F0FDF4;color:#065F46;border-color:#86EFAC;justify-content:space-between;">
+        <span>💰 Financial Aspect</span>
+        ${seriesDropdown}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px;">${rows}</div>`;
+    return;
+  }
+
+  // Individual series or no-series mode
+  const initVal  = Number(sf.baseValue)||0;
+  const totalDiff = list.reduce((sum,v)=> sum + ((Number(v.after)||0)-(Number(v.before)||0)), 0);
+  const curVal   = initVal + totalDiff;
+  const diffClr  = totalDiff>0 ? "#059669" : totalDiff<0 ? "#C2000B" : "#6b7280";
+
+  const highlightHtml = editMode
+    ? `<div class="fin-col fin-col-highlight">
+        <div class="fin-highlight-lbl">ORIGINAL CONTRACT VALUE</div>
+        <div style="margin:5px 0 2px;">
+          <input type="number" class="ei" style="width:100%;font-size:14px;font-weight:700;text-align:center;background:rgba(255,255,255,.7)"
+            placeholder="0" value="${initVal||""}"
+            oninput="setFinancialBaseValue(this.value)"
+            onchange="renderFinancial()">
+        </div>
+        <div class="fin-highlight-sub" style="font-size:9.5px;color:#059669;">↓ VO 합산 후 현재값: ${fmtMoney(curVal)}</div>
+      </div>`
+    : `<div class="fin-col fin-col-highlight">
+        <div class="fin-highlight-lbl">CURRENT CONTRACT VALUE</div>
+        <div class="fin-highlight-val">${initVal||list.length ? fmtMoney(curVal) : "—"}</div>
+        <div class="fin-highlight-sub">${initVal||list.length
+          ? `Original ${fmtMoney(initVal)}<br><span style="color:${diffClr}">${fmtSigned(totalDiff)}</span>`
+          : "No contract value set"}</div>
+      </div>`;
+
+  // Financial notes
+  let itemsBody = items.map((item,ii)=>`
+    <div class="sum-item">
+      <span class="sum-arrow" style="color:#065F46">▸</span>
+      ${editMode
+        ? `<input class="sum-ei" value="${esc(item)}"
+            oninput="setFinancialNote(${ii},this.value)">
+           <button class="sum-del" onclick="removeFinancialNote(${ii})">✕</button>`
+        : `<span class="sum-text">${esc(item)}</span>`}
+    </div>`).join("");
+  if(!items.length && !editMode) itemsBody = `<div style="color:#9ca3af;font-size:12px;padding:4px 0;">No notes yet</div>`;
+  if(editMode) itemsBody += `<button class="btn btn-sm" style="background:#065F46;margin-top:4px;padding:3px 9px;font-size:11px;"
+    onclick="addFinancialNote()">+ Add Item</button>`;
+
+  // VO history
+  let voBody;
+  if(list.length===0 && !editMode){
+    voBody = `<div style="padding:6px 0;color:#9ca3af;font-size:12px;">No VOs recorded yet</div>`;
+  } else {
+    voBody = list.map((v,i)=>{
+      const before = Number(v.before)||0, after = Number(v.after)||0;
+      const diff = after - before;
+      const pct = before ? (diff/before*100) : 0;
+      const dCls = diff>0 ? "up" : diff<0 ? "down" : "flat";
+      if(editMode){
+        return `<div class="vo-chip vo-chip-edit">
+          <button class="vo-del-btn" onclick="deleteVo(${i})">✕</button>
+          <input class="ei" style="font-size:11px;margin-bottom:3px" value="${esc(v.id)}" placeholder="VO No."
+            oninput="setVoField(${i},'id',this.value)">
+          <input class="ei" style="font-size:11px;margin-bottom:3px" value="${esc(v.date)}" placeholder="Date"
+            oninput="setVoField(${i},'date',this.value)">
+          <input class="ei" style="font-size:11px;margin-bottom:3px" value="${esc(v.desc)}" placeholder="VO description"
+            oninput="setVoField(${i},'desc',this.value)">
+          <div style="display:flex;align-items:center;gap:3px;">
+            <input type="number" class="ei" style="width:42%;font-size:11px" value="${before}" placeholder="Before"
+              oninput="setVoField(${i},'before',this.value)" onchange="renderFinancial()">
+            <span style="color:#9ca3af;font-size:11px">→</span>
+            <input type="number" class="ei" style="width:42%;font-size:11px" value="${after}" placeholder="After"
+              oninput="setVoField(${i},'after',this.value)" onchange="renderFinancial()">
+          </div>
+        </div>`;
+      } else {
+        return `<div class="vo-chip">
+          <div class="vo-chip-top"><span>${esc(v.id)||"VO"}</span><span>${esc(v.date)||"—"}</span></div>
+          <div class="vo-chip-desc">${esc(v.desc)||"—"}</div>
+          <div class="vo-chip-price">
+            <span>${fmtMoney(before)}</span><span>→</span><span>${fmtMoney(after)}</span>
+            <span class="vo-chip-delta ${dCls}">${fmtSigned(diff)} (${diff>0?"+":diff<0?"-":""}${Math.abs(pct).toFixed(1)}%)</span>
+          </div>
+        </div>`;
+      }
+    }).join("");
+  }
+  const voAddBtn = editMode ? `<button class="btn btn-sm vo-add-chip" onclick="addVo()">+ Add VO</button>` : "";
+
+  // Currency dropdown — applies to active series or ALL
+  const curCurrency = sf.currency||"USD";
+  const currencySelect = `<select class="esel" style="width:auto;font-size:11px;font-weight:700;color:#065F46;border-color:#86EFAC"
+    onchange="setFinancialCurrency(this.value)">
+    ${opts(["USD","EUR","KRW","JPY","GBP","CNY"], curCurrency)}
+  </select>`;
+
+  el.innerHTML = `
+    <div class="sum-hdr" style="background:#F0FDF4;color:#065F46;border-color:#86EFAC;justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">💰 Financial Aspect ${seriesDropdown}</span>
+      ${currencySelect}
+    </div>
+    <div class="fin-row" style="overflow-x:auto;">
+      ${highlightHtml}
+      <div class="fin-col fin-col-notes">
+        <div class="fin-col-title">Financial Notes</div>
+        <div class="fin-notes-list">${itemsBody}</div>
+      </div>
+      <div class="fin-col-divider"></div>
+      <div class="fin-col fin-col-vo">
+        <div class="fin-col-title">VO History</div>
+        <div class="fin-vo-scroll">${voBody}${voAddBtn}</div>
+      </div>
+    </div>`;
+}
+
+/* ── Financial data setters (series-aware) ── */
+function setFinancialCurrency(val){
+  applyToFinancial(sf=>{ sf.currency=val; });
+  renderFinancial();
+}
+function setFinancialBaseValue(val){
+  applyToFinancial(sf=>{ sf.baseValue = Number(val)||0; });
+}
+function addVo(){
+  applyToFinancial(sf=>{
+    const list = sf.voHistory||(sf.voHistory=[]);
+    const last = list[list.length-1];
+    const baseVal = last ? Number(last.after)||0 : 0;
+    const n = list.length+1;
+    list.push({id:"VO-"+String(n).padStart(2,"0"), date:new Date().toLocaleDateString("en-US"), desc:"Enter VO description", before:baseVal, after:baseVal});
+  });
+  renderFinancial();
+}
+function deleteVo(idx){
+  applyToFinancial(sf=>{ if(sf.voHistory) sf.voHistory.splice(idx,1); });
+  renderFinancial();
+}
+function setVoField(idx, field, val){
+  applyToFinancial(sf=>{ if(sf.voHistory&&sf.voHistory[idx]) sf.voHistory[idx][field]=val; });
+}
+function addFinancialNote(){
+  applyToFinancial(sf=>{ (sf.decisions||(sf.decisions=[])).push(""); });
+  renderFinancial();
+}
+function removeFinancialNote(idx){
+  applyToFinancial(sf=>{ if(sf.decisions) sf.decisions.splice(idx,1); });
+  renderFinancial();
+}
+function setFinancialNote(idx, val){
+  applyToFinancial(sf=>{ if(sf.decisions) sf.decisions[idx]=val; });
+}
+
+// ═══════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════
+function toggleEdit(){
+  editMode = !editMode;
+  render();
+}
+
+async function doSave(){
+  const ok = await writeToFile();
+  if(ok){
+    const toast = document.getElementById("save-toast");
+    toast.classList.add("show");
+    setTimeout(()=>toast.classList.remove("show"), 2500);
+  }
+}
+
+function buildProjectTitle(m){
+  const sy = (m.shipyard||"").trim();
+  const hn = (m.hullNum||"").trim();
+  const pt = (m.projType||"").trim();
+  if(!sy && !hn && !pt) return m.name || "New Project";
+  return [sy, hn ? hn+"s" : "", pt, "Project"].filter(Boolean).join(" ");
+}
+
+function syncProjName(){
+  const d = getCurrent();
+  const p = projects.find(p=>p.id===activeId);
+  if(p){ p.name = d.meta.name; renderSidebar(); }
+}
+
+function applyTitleFields(){
+  const d = getCurrent();
+  const m = d.meta;
+  m.name = buildProjectTitle(m);
+  syncProjName();
+  syncDeliveryVessels(d);
+  renderChecklist();
+  const preview = document.getElementById("hdr-title") && document.getElementById("hdr-title").querySelector(".title-preview");
+  if(preview) preview.textContent = m.name;
+}
+
+function selectProject(pid){
+  activeId = pid;
+  editMode = false;
+  selCatId = null;
+  filterBy = "all";
+  if(!projData[pid]) projData[pid] = sampleProject();
+  render();
+}
+
+async function addProject(){
+  const name = prompt("Enter new project name:");
+  if(!name) return;
+  const pid = "proj_"+Date.now();
+  const color = PROJ_COLORS[projects.length % PROJ_COLORS.length];
+  projects.push({id:pid,name,color});
+  projData[pid] = {meta:defaultMeta(name),stages:defaultStages(),cats:defaultCats(),summary:defaultSummary(),deliveryChecklist:defaultChecklist()};
+  await writeToFile();
+  selectProject(pid);
+}
+
+/* ── TOTAL DELIVERY PIVOT ── */
+let tdSortDir = 1; // 1=asc, -1=desc
+
+function gatherDeliveryRows(){
+  const rows = [];
+  projects.forEach(proj=>{
+    const d = projData[proj.id];
+    if(!d || !d.deliveryChecklist) return;
+    d.deliveryChecklist.forEach(grp=>{
+      grp.items.forEach((it, ii)=>{
+        rows.push({
+          projId: proj.id,
+          gi: d.deliveryChecklist.indexOf(grp),
+          ii,
+          project: proj.name,
+          vessel: grp.name||"—",
+          item: it.name||"—",
+          deliveryDate: it.deliveryDate||"",
+          gr: it.gr||"X",
+          comment: it.comment||""
+        });
+      });
+    });
+  });
+  return rows;
+}
+
+function parseTdDate(s){
+  if(!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function renderTotalDelivery(){
+  const rows = gatherDeliveryRows();
+  rows.sort((a,b)=>{
+    const da = parseTdDate(a.deliveryDate), db = parseTdDate(b.deliveryDate);
+    if(!da && !db) return 0;
+    if(!da) return 1; if(!db) return -1;
+    return tdSortDir * (da - db);
+  });
+
+  const arrow = tdSortDir===1 ? "▲" : "▼";
+  const html = rows.length===0
+    ? `<div style="padding:20px;text-align:center;color:#9ca3af;">데이터가 없습니다.</div>`
+    : `<table class="td-tbl">
+        <thead><tr>
+          <th>Project</th>
+          <th>Vessel</th>
+          <th>Item</th>
+          <th class="sortable" onclick="tdToggleSort()" title="정렬">Delivery Date ${arrow}</th>
+          <th>GR</th>
+          <th>Comment</th>
+        </tr></thead>
+        <tbody>${rows.map((r,idx)=>`
+          <tr>
+            <td style="font-size:12px;color:#6b7280;">${esc(r.project)}</td>
+            <td style="font-weight:600;">${esc(r.vessel)}</td>
+            <td>${esc(r.item)}</td>
+            <td style="white-space:nowrap;font-weight:600;">${esc(r.deliveryDate)||"—"}</td>
+            <td class="${r.gr==="O"?"td-gr-o":"td-gr-x"}">${r.gr}</td>
+            <td><input class="td-comment-input" value="${esc(r.comment)}" placeholder="메모..."
+              oninput="saveTdComment('${r.projId}',${r.gi},${r.ii},this.value)"></td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+
+  document.getElementById("td-table-wrap").innerHTML = html;
+}
+
+function tdToggleSort(){
+  tdSortDir *= -1;
+  renderTotalDelivery();
+}
+
+function saveTdComment(projId, gi, ii, val){
+  const d = projData[projId];
+  if(d && d.deliveryChecklist[gi] && d.deliveryChecklist[gi].items[ii]){
+    d.deliveryChecklist[gi].items[ii].comment = val;
+  }
+}
+
+function openTotalDelivery(){
+  renderTotalDelivery();
+  document.getElementById("total-delivery-overlay").classList.add("show");
+}
+
+function closeTotalDelivery(){
+  document.getElementById("total-delivery-overlay").classList.remove("show");
+}
+
+function moveProject(pid, dir){
+  const idx = projects.findIndex(p=>p.id===pid);
+  if(idx===-1) return;
+  const to = idx + dir;
+  if(to < 0 || to >= projects.length) return;
+  // swap in projects array
+  [projects[idx], projects[to]] = [projects[to], projects[idx]];
+  renderSidebar();
+}
+
+async function deleteProject(pid){
+  if(!confirm(`Delete project "${projects.find(p=>p.id===pid)?.name}"?`)) return;
+  projects = projects.filter(p=>p.id!==pid);
+  delete projData[pid];
+  await writeToFile();
+  activeId = projects[0]?.id||null;
+  render();
+}
+
+function setFilter(f){ filterBy=f; renderCats(); }
+
+function selectCat(id){
+  selCatId = selCatId===id ? null : id;
+  renderCats();
+  renderDetail();
+  if(selCatId){
+    setTimeout(()=>document.getElementById("detail-panel").scrollIntoView({behavior:"smooth",block:"nearest"}),50);
+  }
+}
+
+function closeDetail(){ selCatId=null; renderCats(); renderDetail(); }
+
+function addCat(){
+  const d = getCurrent();
+  d.cats.push({id:Date.now(),name:"New Category",priority:"Medium",status:"Open",due:"",owner:"",issues:[]});
+  renderCats();
+}
+
+function deleteCat(idx){
+  if(!confirm("Delete this category?")) return;
+  const d = getCurrent();
+  if(selCatId===d.cats[idx]?.id) selCatId=null;
+  d.cats.splice(idx,1);
+  renderCats(); renderDetail();
+}
+
+function updateIssueStatus(catIdx, issueIdx, val){
+  const d = getCurrent();
+  d.cats[catIdx].issues[issueIdx].status = val;
+  renderDetail();
+  renderCats(); // update open count
+  renderRight(); // update open category count
+}
+
+function addIssue(catIdx){
+  const d = getCurrent();
+  d.cats[catIdx].issues.push({id:"U-"+Date.now()%100000, date:"", desc:"", photo:""});
+  renderDetail(); renderCats();
+}
+
+function deleteIssue(catIdx, issueIdx){
+  const d = getCurrent();
+  d.cats[catIdx].issues.splice(issueIdx,1);
+  renderDetail(); renderCats();
+}
+
+function handleUpdatePhoto(catIdx, issueIdx, inputEl){
+  const file = inputEl.files && inputEl.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    getCurrent().cats[catIdx].issues[issueIdx].photo = e.target.result;
+    renderDetail();
+  };
+  reader.readAsDataURL(file);
+}
+
+function openLightbox(src){
+  document.getElementById("lightbox-img").src = src;
+  document.getElementById("photo-lightbox").classList.add("show");
+}
+function closeLightbox(){
+  document.getElementById("photo-lightbox").classList.remove("show");
+}
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeLightbox(); });
+
+function addSumItem(key){ getCurrent().summary[key].push(""); renderRight(); renderFinancial(); }
+function removeSumItem(key,idx){ getCurrent().summary[key].splice(idx,1); renderRight(); renderFinancial(); }
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+tryAutoConnect();
+</script>
+</body>
+</html>
